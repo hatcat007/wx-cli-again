@@ -23,28 +23,28 @@ fn cmd_status() -> Result<()> {
                     .unwrap_or_else(|| s.trim().to_string())
             })
             .unwrap_or_else(|_| "?".into());
-        println!("wx-daemon 运行中 (PID {})", pid);
+        println!("wx-daemon running (PID {})", pid);
     } else {
-        println!("wx-daemon 未运行");
+        println!("wx-daemon not running");
     }
     Ok(())
 }
 
 fn cmd_stop() -> Result<()> {
     if !transport::is_alive() {
-        println!("daemon 未运行");
+        println!("daemon not running");
         return Ok(());
     }
 
     transport::stop_daemon()?;
-    println!("已停止 wx-daemon");
+    println!("Stopped wx-daemon");
     Ok(())
 }
 
 fn cmd_logs(follow: bool, lines: usize) -> Result<()> {
     let log_path = config::log_path();
     if !log_path.exists() {
-        println!("暂无日志");
+        println!("No logs yet");
         return Ok(());
     }
 

@@ -44,9 +44,9 @@ pub fn cmd_export(
         "json" => serde_json::to_string_pretty(&resp.data)?,
         "yaml" => serde_yaml::to_string(&resp.data)?,
         "txt" => {
-            let group_str = if is_group { "[群]" } else { "" };
+            let group_str = if is_group { "[group]" } else { "" };
             let mut lines = vec![format!(
-                "=== {}{} ({} 条) ===\n",
+                "=== {}{} ({} messages) ===\n",
                 chat_name, group_str, count
             )];
             if let Some(warn) = warning_block_text(&resp.data) {
@@ -68,10 +68,10 @@ pub fn cmd_export(
         }
         _ => {
             // markdown (default)
-            let group_str = if is_group { "（群聊）" } else { "" };
+            let group_str = if is_group { " (group)" } else { "" };
             let mut lines = vec![
                 format!("# {}{}", chat_name, group_str),
-                format!("\n> 导出 {} 条消息\n", count),
+                format!("\n> Exported {} messages\n", count),
             ];
             if let Some(warn) = warning_block_markdown(&resp.data) {
                 lines.push(warn);
@@ -94,7 +94,7 @@ pub fn cmd_export(
     match output {
         Some(path) => {
             std::fs::write(&path, &text)?;
-            println!("已导出 {} 条消息到 {}", count, path);
+            println!("Exported {} messages to {}", count, path);
         }
         None => println!("{}", text),
     }

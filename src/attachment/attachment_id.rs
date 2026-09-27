@@ -71,18 +71,18 @@ pub struct AttachmentId {
 
 impl AttachmentId {
     pub fn encode(&self) -> Result<String> {
-        let json = serde_json::to_vec(self).context("序列化 AttachmentId")?;
+        let json = serde_json::to_vec(self).context("Serializing AttachmentId")?;
         Ok(URL_SAFE_NO_PAD.encode(json))
     }
 
     pub fn decode(s: &str) -> Result<Self> {
         let bytes = URL_SAFE_NO_PAD
             .decode(s.trim())
-            .map_err(|e| anyhow!("attachment_id 不是合法 base64url: {}", e))?;
+            .map_err(|e| anyhow!("attachment_id is not valid base64url: {}", e))?;
         let id: AttachmentId =
-            serde_json::from_slice(&bytes).context("attachment_id payload 非合法 JSON")?;
+            serde_json::from_slice(&bytes).context("attachment_id payload is not valid JSON")?;
         if id.v != 1 {
-            return Err(anyhow!("不支持的 attachment_id 版本 v={}", id.v));
+            return Err(anyhow!("Unsupported attachment_id version v={}", id.v));
         }
         Ok(id)
     }

@@ -40,7 +40,7 @@ fn find_wechat_pid() -> Option<u32> {
 fn parse_maps(pid: u32) -> Result<Vec<(u64, u64)>> {
     let maps_path = format!("/proc/{}/maps", pid);
     let content =
-        std::fs::read_to_string(&maps_path).with_context(|| format!("读取 {} 失败", maps_path))?;
+        std::fs::read_to_string(&maps_path).with_context(|| format!("Failed to read {}", maps_path))?;
 
     let mut regions = Vec::new();
     for line in content.lines() {
@@ -69,30 +69,30 @@ fn parse_maps(pid: u32) -> Result<Vec<(u64, u64)>> {
 }
 
 pub fn scan_keys(db_dir: &Path) -> Result<Vec<KeyEntry>> {
-    let pid = find_wechat_pid().context("找不到 WeChat 进程，请确认 WeChat 正在运行")?;
+    let pid = find_wechat_pid().context("WeChat process not found; make sure WeChat is running")?;
     eprintln!("WeChat PID: {}", pid);
 
     let db_salts = collect_db_salts(db_dir);
-    eprintln!("找到 {} 个加密数据库", db_salts.len());
+    eprintln!("Found {} encrypted databases", db_salts.len());
 
-    eprintln!("扫描进程内存...");
+    eprintln!("Scanning process memory...");
     let regions = parse_maps(pid)?;
-    eprintln!("找到 {} 个可读写内存区域", regions.len());
+    eprintln!("Found {} read-write memory regions", regions.len());
 
     let mem_path = format!("/proc/{}/mem", pid);
     let mut mem_file = std::fs::File::open(&mem_path)
-        .with_context(|| format!("打开 {} 失败，请以 root 权限运行", mem_path))?;
+        .with_context(|| format!("Failed to open {}; run as root", mem_path))?;
 
     let mut raw_keys: Vec<(String, String)> = Vec::new();
     for (start, end) in &regions {
         scan_region(&mut mem_file, *start, *end, &mut raw_keys);
     }
-    eprintln!("找到 {} 个候选密钥", raw_keys.len());
+    eprintln!("Found {} candidate keys", raw_keys.len());
 
     let entries = match_raw_keys(db_dir, &raw_keys, &db_salts);
 
     eprintln!(
-        "匹配到 {}/{} 个数据库密钥（来自 {} 个候选 key）",
+        "Matched {}/{} database keys (from {} candidate keys)",
         entries.len(),
         db_salts.len(),
         raw_keys.len()

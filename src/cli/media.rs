@@ -8,9 +8,9 @@ use crate::crypto::sqlcipher;
 
 /// 从 message/media_*.db 的 VoiceInfo 表按 svr_id 导出 voice_data。
 pub fn cmd_voice_export(svr_id: i64, chat: Option<String>, output: String) -> Result<()> {
-    let cfg = config::load_config().context("请先 wx init")?;
+    let cfg = config::load_config().context("Run wx init first")?;
     let keys: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&cfg.keys_file).context("读取密钥失败")?)?;
+        serde_json::from_str(&std::fs::read_to_string(&cfg.keys_file).context("Failed to read keys")?)?;
 
     // 候选 media 库
     let mut candidates: Vec<(PathBuf, String)> = Vec::new();
@@ -29,7 +29,7 @@ pub fn cmd_voice_export(svr_id: i64, chat: Option<String>, output: String) -> Re
     }
     if candidates.is_empty() {
         bail!(
-            "未找到带密钥的 media_*.db，请 {}",
+            "No media_*.db with a key found; run {}",
             crate::config::RECOMMENDED_KEY_EXTRACT
         );
     }
@@ -88,7 +88,7 @@ pub fn cmd_voice_export(svr_id: i64, chat: Option<String>, output: String) -> Re
             }
             std::fs::write(&out, &data)?;
             println!(
-                "已导出 {} 字节 → {} (from {})",
+                "Exported {} bytes → {} (from {})",
                 data.len(),
                 out.display(),
                 path.display()
@@ -97,7 +97,7 @@ pub fn cmd_voice_export(svr_id: i64, chat: Option<String>, output: String) -> Re
         }
     }
 
-    bail!("未在 media_*.db 中找到 svr_id={}", svr_id);
+    bail!("svr_id={} not found in media_*.db", svr_id);
 }
 
 fn key_of(keys: &serde_json::Value, rel: &str) -> Option<String> {

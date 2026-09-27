@@ -22,15 +22,15 @@ const HEADER_SIZE: usize = 15;
 
 pub fn decode(file_bytes: &[u8], key: V2KeyMaterial<'_>) -> Result<DecodedImage> {
     if file_bytes.len() < HEADER_SIZE {
-        bail!("V2 .dat: 文件过短（{} < {} 字节）", file_bytes.len(), HEADER_SIZE);
+        bail!("V2 .dat: file too short ({} < {} bytes)", file_bytes.len(), HEADER_SIZE);
     }
     let magic: &[u8; 6] = file_bytes[..6].try_into().unwrap();
     if magic != &V2_MAGIC && magic != &V1_MAGIC {
-        bail!("V2 .dat: header magic 不匹配 V1/V2");
+        bail!("V2 .dat: header magic does not match V1/V2");
     }
 
     let aes_key = key.aes_key.ok_or_else(|| {
-        anyhow!("V2 .dat: 需要 image AES key（codex 的 image_key 模块尚未填充）")
+        anyhow!("V2 .dat: image AES key required (image_key module not populated)")
     })?;
 
     let aes_size = u32::from_le_bytes(file_bytes[6..10].try_into().unwrap()) as usize;
@@ -39,21 +39,21 @@ pub fn decode(file_bytes: &[u8], key: V2KeyMaterial<'_>) -> Result<DecodedImage>
     // PKCS7 对齐：aes_size 不是 16 的倍数 → 向上对齐；是 16 的倍数 → 再加一整块
     let aligned_aes_size = aes_size + (16 - (aes_size % 16));
 
-    let aes_end = HEADER_SIZE.checked_add(aligned_aes_size).ok_or_else(|| anyhow!("aes 段长度溢出"))?;
+    let aes_end = HEADER_SIZE.checked_add(aligned_aes_size).ok_or_else(|| anyhow!("AES segment length overflow"))?;
     if aes_end > file_bytes.len() {
         bail!(
-            "V2 .dat: 头部宣称 aes_size={} (aligned={}) 超过文件长度 {}",
+            "V2 .dat: header claims aes_size={} (aligned={}) exceeding file length {}",
             aes_size,
             aligned_aes_size,
             file_bytes.len()
         );
     }
     let raw_end = file_bytes.len().checked_sub(xor_size).ok_or_else(|| {
-        anyhow!("V2 .dat: 头部宣称 xor_size={} 超过文件长度 {}", xor_size, file_bytes.len())
+        anyhow!("V2 .dat: header claims xor_size={} exceeding file length {}", xor_size, file_bytes.len())
     })?;
     if aes_end > raw_end {
         bail!(
-            "V2 .dat: aes_end={} > raw_end={}（aes/xor 段重叠）",
+            "V2 .dat: aes_end={} > raw_end={} (AES/XOR segments overlap)",
             aes_end,
             raw_end
         );
@@ -76,7 +76,7 @@ pub fn decode(file_bytes: &[u8], key: V2KeyMaterial<'_>) -> Result<DecodedImage>
 
     let format = detect_image_format(&out);
     if format == "bin" {
-        bail!("V2 .dat: AES 解密成功但产物 magic 不识别（key 可能错）");
+        bail!("V2 .dat: AES decrypt succeeded but output magic is unrecognized (key may be wrong)");
     }
     Ok(DecodedImage { data: out, format, decoder: "v2" })
 }
@@ -88,7 +88,7 @@ pub fn decode(file_bytes: &[u8], key: V2KeyMaterial<'_>) -> Result<DecodedImage>
 fn aes_ecb_decrypt_pkcs7(key: &[u8; 16], cipher: &[u8]) -> Result<Vec<u8>> {
     use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
     if cipher.is_empty() || cipher.len() % 16 != 0 {
-        bail!("AES 输入长度 {} 不是 16 的倍数", cipher.len());
+        bail!("AES input length {} is not a multiple of 16", cipher.len());
     }
     let aes = aes::Aes128::new(key.into());
     let mut out = Vec::with_capacity(cipher.len());
@@ -97,13 +97,13 @@ fn aes_ecb_decrypt_pkcs7(key: &[u8; 16], cipher: &[u8]) -> Result<Vec<u8>> {
         aes.decrypt_block(&mut block);
         out.extend_from_slice(&block);
     }
-    let pad = *out.last().ok_or_else(|| anyhow!("AES PKCS7: 空输出"))? as usize;
+    let pad = *out.last().ok_or_else(|| anyhow!("AES PKCS7: empty output"))? as usize;
     if pad == 0 || pad > 16 || pad > out.len() {
-        bail!("AES PKCS7: 非法 padding 长度 {}", pad);
+        bail!("AES PKCS7: invalid padding length {}", pad);
     }
     let tail = &out[out.len() - pad..];
     if !tail.iter().all(|&b| b as usize == pad) {
-        bail!("AES PKCS7: padding 字节不一致");
+        bail!("AES PKCS7: inconsistent padding bytes");
     }
     out.truncate(out.len() - pad);
     Ok(out)

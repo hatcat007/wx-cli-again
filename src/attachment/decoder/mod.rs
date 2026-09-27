@@ -68,7 +68,7 @@ pub fn dispatch(dat_bytes: &[u8], v2_key: V2KeyMaterial<'_>) -> Result<DecodedIm
         }
     }
     if dat_bytes.is_empty() {
-        return Err(anyhow!("空 .dat 文件"));
+        return Err(anyhow!("Empty .dat file"));
     }
     v1_xor::decode(dat_bytes)
 }

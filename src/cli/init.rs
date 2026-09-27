@@ -25,8 +25,8 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
                     && Path::new(db_dir).exists()
                     && keys_path.exists()
                 {
-                    println!("已初始化，数据目录: {}", db_dir);
-                    println!("如需重新扫描密钥，使用 --force");
+                    println!("Already initialized, data directory: {}", db_dir);
+                    println!("To rescan keys, use --force");
                     // 仍检查磁盘上是否有未收录的分片
                     if let Ok(existing) = load_existing_entries(&keys_path, Path::new(db_dir)) {
                         let missing = scanner::missing_encrypted_dbs(Path::new(db_dir), &existing);
@@ -36,8 +36,8 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
                                 .filter(|n| scanner::is_critical_missing_db(n))
                                 .collect();
                             println!(
-                                "[wx] 警告：磁盘上仍有 {} 个加密 DB 没有密钥（关键 {} 个，例如 {}）。\n\
-                                 运行 {} 重新提取，并在等待期间打开对应聊天以触发冷分片解密。",
+                                "[wx] Warning: {} encrypted DBs on disk still have no key ({} critical, e.g. {}).\n\
+                                 Run {} to re-extract, and open the matching chats while waiting to trigger cold shard decryption.",
                                 missing.len(),
                                 critical.len(),
                                 critical
@@ -58,7 +58,7 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
 
     // Step 1: 解析 db_dir —— 已有有效配置时优先沿用，避免多账号下 auto-detect 切错库。
     let db_dir = resolve_db_dir(&config_path)?;
-    println!("数据目录: {}", db_dir.display());
+    println!("Data directory: {}", db_dir.display());
 
     // 读取已有密钥（验证仍有效的保留，避免 force 扫描不全时丢 key）
     let keys_file_path = config_path
@@ -68,13 +68,13 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
     let existing_entries = load_existing_entries(&keys_file_path, &db_dir).unwrap_or_default();
     if !existing_entries.is_empty() {
         println!(
-            "已有 {} 个仍可解密的密钥，将与新扫描结果合并",
+            "{} existing keys still decrypt; they will be merged with the new scan results",
             existing_entries.len()
         );
     }
 
     // Step 2: 扫描密钥
-    println!("扫描加密密钥…");
+    println!("Scanning for encryption keys…");
     let mut opts = ScanOptions {
         known: &existing_entries,
         ..ScanOptions::default()
@@ -89,12 +89,12 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
 
     if entries.is_empty() {
         bail!(
-            "没有任何候选 key 能解密所选数据目录中的数据库，已保留现有配置和 key 文件。\n\
-             当前数据目录: {}\n\
-             如果本机登录过多个微信账号，请确认该目录属于当前正在运行的账号；\
-             退出其他账号并让当前账号产生一条新消息后，再运行：\n\
+            "No candidate key can decrypt the databases in the selected data directory; existing config and key files were kept.\n\
+             Current data directory: {}\n\
+             If several WeChat accounts have logged in on this machine, make sure this directory belongs to the running account. \
+             Log out of other accounts, let the current account receive a new message, then run:\n\
              {}\n\
-             冷分片（久未打开的 message_N.db）同一命令，等待期间滚动/打开对应会话。",
+             For cold shards (message_N.db not opened recently) use the same command and scroll/open the matching chats while waiting.",
             db_dir.display(),
             config::RECOMMENDED_KEY_EXTRACT
         );
@@ -108,7 +108,7 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
     // 确保父目录存在（如 ~/.wx-cli/），必须在任何写入之前
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)
-            .with_context(|| format!("创建目录失败: {}", parent.display()))?;
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
     }
 
     // Step 3: 保存 all_keys.json（合并后的完整集合）
@@ -122,13 +122,13 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
         );
     }
     std::fs::write(&keys_file_path, serde_json::to_string_pretty(&keys_json)?)
-        .context("写入 all_keys.json 失败")?;
+        .context("Failed to write all_keys.json")?;
     println!(
-        "成功保存 {} 个数据库密钥（本次新匹配 {}）",
+        "Saved {} database keys ({} newly matched)",
         entries.len(),
         scanned.len()
     );
-    println!("密钥已保存: {}", keys_file_path.display());
+    println!("Keys saved: {}", keys_file_path.display());
 
     let missing = scanner::list_missing_encrypted_dbs(&db_dir, &entries);
     let critical: Vec<_> = missing
@@ -137,13 +137,13 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
         .collect();
     if !missing.is_empty() {
         println!(
-            "[wx] 警告：仍有 {} 个加密 DB 没有密钥（其中 {} 个影响聊天完整性）：",
+            "[wx] Warning: {} encrypted DBs still have no key ({} affect chat completeness):",
             missing.len(),
             critical.len()
         );
         for m in missing.iter().take(12) {
             let tag = if scanner::is_critical_missing_db(&m.rel) {
-                " [关键]"
+                " [critical]"
             } else {
                 ""
             };
@@ -155,12 +155,12 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
             );
         }
         if missing.len() > 12 {
-            println!("  … 另有 {} 个", missing.len() - 12);
+            println!("  … {} more", missing.len() - 12);
         }
         if !critical.is_empty() {
             println!(
-                "补齐关键分片：{}\n\
-                 等待期间请在微信中打开相关聊天/滚动历史，触发冷分片加载。",
+                "To fill in critical shards: {}\n\
+                 While waiting, open the relevant chats in WeChat and scroll their history to trigger cold shard loading.",
                 config::RECOMMENDED_KEY_EXTRACT
             );
         }
@@ -184,20 +184,20 @@ pub fn cmd_init(force: bool, hook_seconds: Option<u64>) -> Result<()> {
         .or_insert_with(|| json!("decrypted"));
 
     std::fs::write(&config_path, serde_json::to_string_pretty(&cfg)?)
-        .context("写入 config.json 失败")?;
-    println!("配置已保存: {}", config_path.display());
-    println!("初始化完成，可以使用 wx sessions / wx history 等命令了");
+        .context("Failed to write config.json")?;
+    println!("Config saved: {}", config_path.display());
+    println!("Initialization complete. You can now use wx sessions / wx history and other commands");
 
     #[cfg(target_os = "macos")]
     {
         println!();
-        println!("[macOS] 说明：");
-        println!("  · SIP 无需关闭；wx-cli 不会自动 ad-hoc 重签 WeChat.app。");
+        println!("[macOS] Notes:");
+        println!("  · SIP does not need to be disabled; wx-cli never ad-hoc re-signs WeChat.app automatically.");
         println!(
-            "  · 官网部分 4.x 包本身已是 ad-hoc，可直接用户态 LLDB hook，无需 sudo 重签。"
+            "  · Some 4.x website builds are already ad-hoc signed, so the user-mode LLDB hook works without sudo or re-signing."
         );
         println!(
-            "  · 官方 Hardened Runtime 包：内存扫描请 sudo；补冷分片用 --hook-seconds。"
+            "  · Official Hardened Runtime builds: run the memory scan with sudo; use --hook-seconds for cold shards."
         );
     }
 
@@ -233,9 +233,9 @@ fn resolve_db_dir(config_path: &Path) -> Result<PathBuf> {
                         if let Some(detected) = config::auto_detect_db_dir() {
                             if detected != p {
                                 eprintln!(
-                                    "[wx] 提示：检测到更新的微信数据目录 {}，\n\
-                                     当前仍使用已配置的 {}。\n\
-                                     若要切换账号，请编辑 config.json 的 db_dir 后重新 init。",
+                                    "[wx] Note: detected a newer WeChat data directory {},\n\
+                                     still using the configured {}.\n\
+                                     To switch accounts, edit db_dir in config.json and run init again.",
                                     detected.display(),
                                     p.display()
                                 );
@@ -247,9 +247,9 @@ fn resolve_db_dir(config_path: &Path) -> Result<PathBuf> {
             }
         }
     }
-    println!("检测微信数据目录...");
+    println!("Detecting WeChat data directory...");
     config::auto_detect_db_dir()
-        .context("未能自动检测到微信数据目录\n请手动编辑 config.json 中的 db_dir 字段")
+        .context("Could not detect the WeChat data directory automatically\nEdit the db_dir field in config.json manually")
 }
 
 /// 加载已有 all_keys.json，并丢弃无法再解密对应 DB 的条目。
@@ -339,10 +339,10 @@ fn drop_privileges_if_sudo() -> Result<()> {
     // 必须先 setgid 再 setuid：一旦 uid 降下来就没法再改 gid 了。
     unsafe {
         if libc::setgid(gid) != 0 {
-            anyhow::bail!("setgid({}) 失败: {}", gid, std::io::Error::last_os_error());
+            anyhow::bail!("setgid({}) failed: {}", gid, std::io::Error::last_os_error());
         }
         if libc::setuid(uid) != 0 {
-            anyhow::bail!("setuid({}) 失败: {}", uid, std::io::Error::last_os_error());
+            anyhow::bail!("setuid({}) failed: {}", uid, std::io::Error::last_os_error());
         }
     }
 

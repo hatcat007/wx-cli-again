@@ -210,7 +210,7 @@ pub(crate) fn derive_xor_key_from_v2_dat(
         .enumerate()
         .max_by_key(|(_, count)| *count)
         .map(|(idx, count)| (idx as u8, *count))
-        .expect("votes 非空");
+        .expect("votes is non-empty");
     Ok(Some((xor_key, top_votes, votes.len())))
 }
 

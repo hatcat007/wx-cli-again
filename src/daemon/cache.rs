@@ -147,10 +147,10 @@ impl DbCache {
     /// 打开解密产物做 cheap 校验（sqlite_master），防止错 key 粘住 CacheHit。
     fn probe_decrypted_db(path: &Path) -> Result<()> {
         let conn = Connection::open(path)
-            .with_context(|| format!("探测打开解密缓存失败: {}", path.display()))?;
+            .with_context(|| format!("Failed to probe-open decrypted cache: {}", path.display()))?;
         let n: i64 = conn
             .query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))
-            .context("解密缓存 sqlite_master 探测失败（密钥可能错误）")?;
+            .context("Decrypted cache sqlite_master probe failed (key may be wrong)")?;
         let _ = n;
         Ok(())
     }
@@ -165,7 +165,7 @@ impl DbCache {
         }
         std::fs::rename(tmp, final_path).with_context(|| {
             format!(
-                "原子替换缓存失败: {} → {}",
+                "Failed to atomically replace cache: {} → {}",
                 tmp.display(),
                 final_path.display()
             )
@@ -277,7 +277,7 @@ impl DbCache {
         if tmp.exists() {
             Self::atomic_install_cache(tmp, final_path)?;
         } else if !final_path.exists() {
-            anyhow::bail!("缓存产物缺失: {}", final_path.display());
+            anyhow::bail!("Cache output missing: {}", final_path.display());
         }
         // rename 后再确认一次（replace 可能刚结束）
         let key_ok = self
@@ -328,7 +328,7 @@ impl DbCache {
             }
             Err(e) => {
                 eprintln!(
-                    "[cache] online 打开失败 {}，回退解密缓存: {:#}",
+                    "[cache] Online open failed for {}, falling back to decrypted cache: {:#}",
                     rel_key, e
                 );
             }
@@ -407,7 +407,7 @@ impl DbCache {
             }
         }
         if reused > 0 {
-            eprintln!("[cache] 复用 {} 个已解密 DB", reused);
+            eprintln!("[cache] Reusing {} decrypted DBs", reused);
         }
     }
 
@@ -517,7 +517,7 @@ impl DbCache {
         };
 
         let enc_key_bytes =
-            hex_to_32bytes(&enc_key_hex).with_context(|| format!("密钥格式错误: {}", rel_key))?;
+            hex_to_32bytes(&enc_key_hex).with_context(|| format!("Malformed key: {}", rel_key))?;
 
         if let Some(entry) = cached.as_ref() {
             if entry.db_mtime == db_mt && entry.decrypted_path.exists() {
@@ -541,7 +541,7 @@ impl DbCache {
                         let _ = std::fs::remove_file(&tmp2);
                     }
                     std::fs::copy(&out_src, &tmp2).with_context(|| {
-                        format!("复制缓存到 temp 失败: {}", out_src.display())
+                        format!("Failed to copy cache to temp: {}", out_src.display())
                     })?;
                     if wal_path2.exists() {
                         wal::apply_wal(&wal_path2, &tmp2, &key_copy)?;
@@ -551,7 +551,7 @@ impl DbCache {
                 })
                 .await??;
                 eprintln!(
-                    "[cache] WAL 增量 {} ({}ms)",
+                    "[cache] WAL incremental {} ({}ms)",
                     rel_key,
                     t0.elapsed().as_millis()
                 );
@@ -588,7 +588,7 @@ impl DbCache {
         tokio::task::spawn_blocking(move || {
             if !crypto::validate_raw_key_for_db(&db_path2, &key_copy) {
                 anyhow::bail!(
-                    "密钥无法通过源库 HMAC/页头校验: {}（请 {} 或 wx key set）",
+                    "Key failed source DB HMAC/page header check: {} (run {} or wx key set)",
                     db_path2.display(),
                     crate::config::RECOMMENDED_KEY_EXTRACT
                 );
@@ -606,7 +606,7 @@ impl DbCache {
         .await??;
 
         eprintln!(
-            "[cache] 全量解密 {} ({}ms)",
+            "[cache] Full decrypt {} ({}ms)",
             rel_key,
             t0.elapsed().as_millis()
         );
@@ -652,12 +652,12 @@ fn wal_path_for(db_path: &Path) -> PathBuf {
 
 fn hex_to_32bytes(s: &str) -> Result<[u8; 32]> {
     if s.len() != 64 {
-        anyhow::bail!("密钥 hex 长度应为 64，实际为 {}", s.len());
+        anyhow::bail!("Key hex length must be 64, got {}", s.len());
     }
     let mut out = [0u8; 32];
     for i in 0..32 {
         out[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)
-            .with_context(|| format!("非法 hex 字符 at {}", i * 2))?;
+            .with_context(|| format!("Invalid hex character at {}", i * 2))?;
     }
     Ok(out)
 }

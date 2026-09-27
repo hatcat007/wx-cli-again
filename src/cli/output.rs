@@ -42,7 +42,7 @@ pub fn print_response(data: &serde_json::Value, opts: &OutputOpts) -> anyhow::Re
 
 pub fn emit_warnings(data: &serde_json::Value) {
     for line in warning_lines(data) {
-        eprintln!("[wx] 警告：{}", line);
+        eprintln!("[wx] Warning: {}", line);
     }
 }
 
@@ -65,7 +65,7 @@ pub fn warning_lines(data: &serde_json::Value) -> Vec<String> {
 
     if !unknown_shards.is_empty() {
         lines.push(format!(
-            "磁盘上发现 daemon 不认识的分片 {}，结果可能不完整；请在本机 Terminal 运行 {}",
+            "Found shards on disk unknown to the daemon: {}; results may be incomplete. Run {} in a local Terminal",
             unknown_shards.join(", "),
             crate::config::RECOMMENDED_KEY_EXTRACT_HINT
         ));
@@ -80,9 +80,9 @@ pub fn warning_lines(data: &serde_json::Value) -> Vec<String> {
                 .get("chat")
                 .and_then(|v| v.as_str())
                 .or_else(|| data.get("username").and_then(|v| v.as_str()))
-                .unwrap_or("当前查询");
+                .unwrap_or("current query");
             lines.push(format!(
-                "session.db 显示 '{}' 最新到 {}，但本次扫描只到 {}，结果可能过期或不完整。",
+                "session.db shows '{}' up to {}, but this scan only reached {}; results may be stale or incomplete.",
                 subject,
                 fmt_meta_ts(session_ts),
                 fmt_meta_ts(chat_ts),
@@ -101,7 +101,7 @@ pub fn warning_block_text(data: &serde_json::Value) -> Option<String> {
     Some(
         lines
             .into_iter()
-            .map(|line| format!("[wx] 警告：{}", line))
+            .map(|line| format!("[wx] Warning: {}", line))
             .collect::<Vec<_>>()
             .join("\n"),
     )

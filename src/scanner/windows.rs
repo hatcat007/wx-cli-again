@@ -58,21 +58,21 @@ fn find_wechat_pid() -> Option<u32> {
 }
 
 pub fn scan_keys(db_dir: &Path) -> Result<Vec<KeyEntry>> {
-    let pid = find_wechat_pid().context("找不到 Weixin.exe 进程，请确认微信正在运行")?;
+    let pid = find_wechat_pid().context("Weixin.exe process not found; make sure WeChat is running")?;
     eprintln!("WeChat PID: {}", pid);
 
     // SAFETY: OpenProcess 请求读取权限
     let process = unsafe {
         OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid)
-            .context("OpenProcess 失败，请以管理员权限运行")?
+            .context("OpenProcess failed; run as administrator")?
     };
 
     let db_salts = collect_db_salts(db_dir);
-    eprintln!("找到 {} 个加密数据库", db_salts.len());
+    eprintln!("Found {} encrypted databases", db_salts.len());
 
-    eprintln!("扫描进程内存...");
+    eprintln!("Scanning process memory...");
     let raw_keys = scan_memory(process)?;
-    eprintln!("找到 {} 个候选密钥", raw_keys.len());
+    eprintln!("Found {} candidate keys", raw_keys.len());
 
     // SAFETY: 关闭进程句柄
     unsafe {
@@ -81,7 +81,7 @@ pub fn scan_keys(db_dir: &Path) -> Result<Vec<KeyEntry>> {
 
     let entries = match_raw_keys(db_dir, &raw_keys, &db_salts);
     eprintln!(
-        "匹配到 {}/{} 个数据库密钥（来自 {} 个候选 key）",
+        "Matched {}/{} database keys (from {} candidate keys)",
         entries.len(),
         db_salts.len(),
         raw_keys.len()

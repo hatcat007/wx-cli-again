@@ -47,7 +47,7 @@ impl ImageKeyProvider for MacosImageKeyProvider {
         let configured_db_dir = self
             .configured_db_dir
             .as_ref()
-            .map_err(|err| anyhow::anyhow!("读取 config.db_dir 失败: {}", err))?;
+            .map_err(|err| anyhow::anyhow!("Failed to read config.db_dir: {}", err))?;
         let db_dir = configured_db_dir_for_wxid(configured_db_dir, wxid);
         let attach_dir = attach_root_for_db_dir(&db_dir);
         let key = derive_key_for_paths(&db_dir, &attach_dir)?;
@@ -59,7 +59,7 @@ impl ImageKeyProvider for MacosImageKeyProvider {
 fn derive_key_for_paths(db_dir: &Path, attach_dir: &Path) -> Result<ImageKeyMaterial> {
     let templates = find_v2_template_ciphertexts(attach_dir, 3, 64)?;
     if templates.is_empty() {
-        bail!("在 {} 下找不到 V2 模板文件", attach_dir.display());
+        bail!("No V2 template file found under {}", attach_dir.display());
     }
 
     if let Some(found) = find_via_kvcomm(db_dir, &templates)? {
@@ -67,9 +67,9 @@ fn derive_key_for_paths(db_dir: &Path, attach_dir: &Path) -> Result<ImageKeyMate
     }
 
     let (wxid_full, wxid_norm, suffix) =
-        extract_wxid_parts(db_dir).context("db_dir 不含可用于 fallback 的 wxid 4 位后缀")?;
+        extract_wxid_parts(db_dir).context("db_dir has no 4-character wxid suffix usable for fallback")?;
     let (xor_key, _votes, _total) = derive_xor_key_from_v2_dat(attach_dir, 10, 3)?
-        .context("V2 .dat 样本不足，无法投票反推 xor_key")?;
+        .context("Not enough V2 .dat samples to infer xor_key by voting")?;
 
     for wxid in preferred_wxid_candidates(&wxid_full, &wxid_norm) {
         if let Some(aes_key) = bruteforce_aes_key(xor_key, &suffix, wxid, &templates)? {
@@ -77,7 +77,7 @@ fn derive_key_for_paths(db_dir: &Path, attach_dir: &Path) -> Result<ImageKeyMate
         }
     }
 
-    bail!("macOS V2 图片 key 派生失败")
+    bail!("Failed to derive macOS V2 image key")
 }
 
 fn find_via_kvcomm(db_dir: &Path, templates: &[[u8; 16]]) -> Result<Option<ImageKeyMaterial>> {
@@ -269,7 +269,7 @@ fn bruteforce_aes_key(
 
 fn hex_prefix_to_bytes(hex: &str) -> Result<[u8; 2]> {
     if hex.len() != 4 {
-        bail!("wxid suffix 不是 4 位 hex: {}", hex);
+        bail!("wxid suffix is not 4 hex characters: {}", hex);
     }
     let hi = u8::from_str_radix(&hex[..2], 16)?;
     let lo = u8::from_str_radix(&hex[2..], 16)?;

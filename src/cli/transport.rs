@@ -39,7 +39,7 @@ pub fn ensure_daemon() -> Result<()> {
     if is_alive() {
         return Ok(());
     }
-    eprintln!("启动 wx-daemon...");
+    eprintln!("Starting wx-daemon...");
     start_daemon()?;
     Ok(())
 }
@@ -55,7 +55,7 @@ pub fn stop_daemon() -> Result<()> {
             let belongs = pid_belongs_to_daemon(&pid_file)?;
             if daemon_alive && !belongs {
                 bail!(
-                    "daemon 正在运行，但 {} 指向的 PID {} 无法确认属于当前 wx-daemon",
+                    "daemon is running, but {} points to PID {}, which cannot be confirmed as this wx-daemon",
                     pid_path.display(),
                     pid_file.pid
                 );
@@ -66,7 +66,7 @@ pub fn stop_daemon() -> Result<()> {
         }
         None if daemon_alive => {
             bail!(
-                "daemon 正在运行，但 {} 缺失或损坏，无法安全停止",
+                "daemon is running, but {} is missing or corrupt; cannot stop it safely",
                 pid_path.display()
             );
         }
@@ -84,7 +84,7 @@ pub fn stop_daemon() -> Result<()> {
 fn preflight_cli_dir_writable() -> Result<()> {
     let cli_dir = config::cli_dir();
     std::fs::create_dir_all(&cli_dir)
-        .with_context(|| format!("创建 {} 失败", cli_dir.display()))?;
+        .with_context(|| format!("Failed to create {}", cli_dir.display()))?;
 
     let probe = cli_dir.join(".daemon_probe");
     match std::fs::File::create(&probe) {
@@ -96,23 +96,23 @@ fn preflight_cli_dir_writable() -> Result<()> {
             let dir = cli_dir.display();
             if cfg!(unix) {
                 bail!(
-                    "无法写入 {dir}（权限不足）\n\n\
-                     这通常是老版本的 `sudo wx init` 把目录属主留成了 root。\n\
-                     修复：\n\n    \
+                    "Cannot write {dir} (permission denied)\n\n\
+                     This usually happens when an old `sudo wx init` left the directory owned by root.\n\
+                     Fix:\n\n    \
                      sudo chown -R $(whoami) {dir}\n\n\
-                     （新版已修复此问题，下次 init 不会再发生）",
+                     (fixed in newer versions; the next init will not cause this again)",
                 )
             } else {
-                bail!("无法写入 {dir}: {e}")
+                bail!("Cannot write {dir}: {e}")
             }
         }
-        Err(e) => bail!("无法写入 {}: {}", cli_dir.display(), e),
+        Err(e) => bail!("Cannot write {}: {}", cli_dir.display(), e),
     }
 }
 
 /// 启动 daemon 进程（自身二进制，设置 WX_DAEMON_MODE=1）
 fn start_daemon() -> Result<()> {
-    let exe = std::env::current_exe().context("无法获取当前可执行文件路径")?;
+    let exe = std::env::current_exe().context("Cannot get the current executable path")?;
     let child_pid: u32;
 
     // 预检：当前用户是否能写 ~/.wx-cli/。如果不能，给出可操作的错误信息，
@@ -147,7 +147,7 @@ fn start_daemon() -> Result<()> {
                 Ok(())
             });
         }
-        let child = cmd.spawn().context("无法启动 daemon 进程")?;
+        let child = cmd.spawn().context("Cannot start the daemon process")?;
         child_pid = child.id();
     }
 
@@ -172,7 +172,7 @@ fn start_daemon() -> Result<()> {
             .stderr(stderr_stdio)
             .creation_flags(0x00000008) // DETACHED_PROCESS
             .spawn()
-            .context("无法启动 daemon 进程")?;
+            .context("Cannot start the daemon process")?;
         child_pid = child.id();
     }
 
@@ -187,7 +187,7 @@ fn start_daemon() -> Result<()> {
     }
 
     bail!(
-        "wx-daemon 启动超时（>{}s）\n请查看日志: {}",
+        "wx-daemon start timed out (>{}s)\nSee the log: {}",
         STARTUP_TIMEOUT_SECS,
         config::log_path().display()
     )
@@ -196,7 +196,7 @@ fn start_daemon() -> Result<()> {
 fn write_pid_file(pid: u32, exe: &Path) -> Result<()> {
     if let Some(parent) = config::pid_path().parent() {
         std::fs::create_dir_all(parent)
-            .with_context(|| format!("创建 {} 失败", parent.display()))?;
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
     }
     let pid_file = PidFile {
         pid,
@@ -204,7 +204,7 @@ fn write_pid_file(pid: u32, exe: &Path) -> Result<()> {
     };
     let content = serde_json::to_string(&pid_file)?;
     std::fs::write(config::pid_path(), content)
-        .with_context(|| format!("写入 {} 失败", config::pid_path().display()))?;
+        .with_context(|| format!("Failed to write {}", config::pid_path().display()))?;
     Ok(())
 }
 
@@ -212,7 +212,7 @@ fn read_pid_file(path: &Path) -> Result<Option<PidFile>> {
     let content = match std::fs::read_to_string(path) {
         Ok(content) => content,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => return Err(err).with_context(|| format!("读取 {} 失败", path.display())),
+        Err(err) => return Err(err).with_context(|| format!("Failed to read {}", path.display())),
     };
     if let Ok(pid_file) = serde_json::from_str::<PidFile>(&content) {
         return Ok(Some(pid_file));
@@ -223,7 +223,7 @@ fn read_pid_file(path: &Path) -> Result<Option<PidFile>> {
             exe: std::env::current_exe().ok(),
         }));
     }
-    bail!("{} 不是合法的 PID 文件", path.display())
+    bail!("{} is not a valid PID file", path.display())
 }
 
 fn cleanup_ipc_files() {
@@ -299,7 +299,7 @@ fn unix_pid_matches_daemon(pid: u32, expected_exe: Option<&Path>) -> Result<bool
     let output = std::process::Command::new("ps")
         .args(["-o", "command=", "-p", &pid.to_string()])
         .output()
-        .with_context(|| format!("读取 PID {} 的 command 失败", pid))?;
+        .with_context(|| format!("Failed to read the command of PID {}", pid))?;
     if !output.status.success() {
         return Ok(false);
     }
@@ -384,7 +384,7 @@ fn terminate_pid_unix(pid: u32) -> Result<()> {
         if err.raw_os_error() == Some(libc::ESRCH) {
             return Ok(());
         }
-        bail!("停止 PID {} 失败: {}", pid, err);
+        bail!("Failed to stop PID {}: {}", pid, err);
     }
 
     let deadline = std::time::Instant::now() + Duration::from_millis(STOP_TIMEOUT_MS);
@@ -395,7 +395,7 @@ fn terminate_pid_unix(pid: u32) -> Result<()> {
         std::thread::sleep(Duration::from_millis(50));
     }
 
-    bail!("等待 PID {} 退出超时", pid)
+    bail!("Timed out waiting for PID {} to exit", pid)
 }
 
 #[cfg(unix)]
@@ -413,9 +413,9 @@ fn terminate_pid_windows(pid: u32) -> Result<()> {
     let status = std::process::Command::new("taskkill")
         .args(["/F", "/PID", &pid.to_string()])
         .status()
-        .with_context(|| format!("执行 taskkill /PID {} 失败", pid))?;
+        .with_context(|| format!("Failed to run taskkill /PID {}", pid))?;
     if !status.success() {
-        bail!("停止 PID {} 失败: taskkill exit {:?}", pid, status.code());
+        bail!("Failed to stop PID {}: taskkill exit {:?}", pid, status.code());
     }
     Ok(())
 }
@@ -434,7 +434,7 @@ pub fn send(req: Request) -> Result<Response> {
     }
     #[cfg(not(any(unix, windows)))]
     {
-        bail!("不支持当前平台")
+        bail!("Unsupported platform")
     }
 }
 
@@ -442,7 +442,7 @@ pub fn send(req: Request) -> Result<Response> {
 fn send_unix(req: Request) -> Result<Response> {
     use std::os::unix::net::UnixStream;
     let sock_path = config::sock_path();
-    let mut stream = UnixStream::connect(&sock_path).context("连接 daemon socket 失败")?;
+    let mut stream = UnixStream::connect(&sock_path).context("Failed to connect to daemon socket")?;
     stream.set_read_timeout(Some(Duration::from_secs(120))).ok();
     stream
         .set_write_timeout(Some(Duration::from_secs(120)))
@@ -455,10 +455,10 @@ fn send_unix(req: Request) -> Result<Response> {
     let mut reader = BufReader::new(&stream);
     reader.read_line(&mut line)?;
 
-    let resp: Response = serde_json::from_str(&line).context("解析 daemon 响应失败")?;
+    let resp: Response = serde_json::from_str(&line).context("Failed to parse daemon response")?;
 
     if !resp.ok {
-        bail!("{}", resp.error.as_deref().unwrap_or("未知错误"));
+        bail!("{}", resp.error.as_deref().unwrap_or("unknown error"));
     }
 
     Ok(resp)
@@ -470,8 +470,8 @@ fn send_windows(req: Request) -> Result<Response> {
 
     let name = "wx-cli-daemon"
         .to_ns_name::<GenericNamespaced>()
-        .context("构造 pipe name 失败")?;
-    let stream = Stream::connect(name).context("连接 daemon named pipe 失败")?;
+        .context("Failed to build pipe name")?;
+    let stream = Stream::connect(name).context("Failed to connect to daemon named pipe")?;
 
     // interprocess::Stream 同时实现 Read + Write，但需要拆分读写端
     let mut reader = BufReader::new(stream);
@@ -482,10 +482,10 @@ fn send_windows(req: Request) -> Result<Response> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
 
-    let resp: Response = serde_json::from_str(&line).context("解析 daemon 响应失败")?;
+    let resp: Response = serde_json::from_str(&line).context("Failed to parse daemon response")?;
 
     if !resp.ok {
-        bail!("{}", resp.error.as_deref().unwrap_or("未知错误"));
+        bail!("{}", resp.error.as_deref().unwrap_or("unknown error"));
     }
 
     Ok(resp)

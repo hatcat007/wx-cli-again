@@ -124,22 +124,22 @@ pub fn scan_keys_with_options(
     let is_root = unsafe { libc::geteuid() } == 0;
 
     // 1. 查找 WeChat PID
-    let pid = find_wechat_pid().context("找不到 WeChat 进程，请确认 WeChat 正在运行")?;
+    let pid = find_wechat_pid().context("WeChat process not found; make sure WeChat is running")?;
     eprintln!("WeChat PID: {}", pid);
     let signature = detect_signature(pid);
     match signature {
-        SignatureKind::AdHoc => eprintln!("WeChat 签名: ad-hoc（无需再次签名；用户态 LLDB 通常可附加）"),
+        SignatureKind::AdHoc => eprintln!("WeChat signature: ad-hoc (no re-signing needed; user-mode LLDB can usually attach)"),
         SignatureKind::HardenedRuntime => {
-            eprintln!("WeChat 签名: 官方 Hardened Runtime（内存扫描需要 sudo；hook 也建议 sudo）")
+            eprintln!("WeChat signature: official Hardened Runtime (memory scan needs sudo; sudo also recommended for the hook)")
         }
-        SignatureKind::Unknown => eprintln!("WeChat 签名: 未能识别（继续尝试）"),
+        SignatureKind::Unknown => eprintln!("WeChat signature: unrecognized (continuing)"),
     }
 
-    eprintln!("扫描数据库文件...");
+    eprintln!("Scanning database files...");
     let db_salts = collect_db_salts(db_dir);
-    eprintln!("找到 {} 个加密数据库", db_salts.len());
+    eprintln!("Found {} encrypted databases", db_salts.len());
     if db_salts.is_empty() {
-        bail!("数据目录中没有加密的 .db 文件: {}", db_dir.display());
+        bail!("No encrypted .db files in data directory: {}", db_dir.display());
     }
 
     let salt_bytes: Vec<[u8; 16]> = db_salts
@@ -155,23 +155,23 @@ pub fn scan_keys_with_options(
     if is_root {
         let task = obtain_task_port(pid, signature)?;
         eprintln!("Got task port: {}", task);
-        eprintln!("扫描进程内存寻找密钥（x'hex' + salt 邻接）...");
+        eprintln!("Scanning process memory for keys (x'hex' + adjacent salt)...");
         let scanned = scan_memory(task, &salt_bytes, &mut raw_keys, &mut extra_keys, &mut seen_extra)?;
         eprintln!(
-            "内存扫描完成：x'hex' 候选 {} 个，salt 邻接候选 {} 个（读取约 {:.1} MB）",
+            "Memory scan done: {} x'hex' candidates, {} salt-adjacent candidates (read about {:.1} MB)",
             raw_keys.len(),
             extra_keys.len(),
             scanned as f64 / (1024.0 * 1024.0)
         );
     } else {
         eprintln!(
-            "当前非 root：跳过 Mach 内存扫描。若 WeChat 为 ad-hoc 签名，将仅依赖 LLDB hook。"
+            "Not root: skipping Mach memory scan. If WeChat is ad-hoc signed, only the LLDB hook will be used."
         );
         if !matches!(signature, SignatureKind::AdHoc) && hook_seconds == 0 {
             bail!(
-                "读取 WeChat 进程内存需要 root 权限，请从本机 Terminal 运行：\n\
+                "Reading WeChat process memory requires root. Run from a local Terminal:\n\
                  {}\n\
-                 若使用官网 ad-hoc 包，也可不加 sudo：\n\
+                 With the ad-hoc website build you can also skip sudo:\n\
                  wx key extract --hook-seconds 60",
                 crate::config::RECOMMENDED_KEY_EXTRACT
             );
@@ -206,7 +206,7 @@ pub fn scan_keys_with_options(
     }
 
     eprintln!(
-        "内存阶段匹配到 {}/{} 个数据库密钥（候选 key {} 个，含已有密钥）",
+        "Memory stage matched {}/{} database keys ({} candidate keys, including existing keys)",
         entries.len(),
         db_salts.len(),
         all_key_hexes.len()
@@ -220,9 +220,9 @@ pub fn scan_keys_with_options(
         .collect();
     if auto_hook && hook_seconds > 0 && !still_missing.is_empty() {
         eprintln!(
-            "仍有 {} 个数据库未匹配密钥，启动 LLDB hook {}s…\n\
-             请在此期间切换到微信：滚动聊天列表、打开几个会话/历史记录，\n\
-             以触发冷分片 DB 的解密（message_N.db 等）。",
+            "{} databases still have no key; starting LLDB hook for {}s…\n\
+             Meanwhile switch to WeChat: scroll the chat list and open a few chats/histories\n\
+             to trigger decryption of cold shard DBs (message_N.db etc.).",
             still_missing.len(),
             hook_seconds
         );
@@ -232,7 +232,7 @@ pub fn scan_keys_with_options(
             is_root || matches!(signature, SignatureKind::AdHoc),
         ) {
             Ok(hooked) => {
-                eprintln!("LLDB hook 捕获到 {} 个 32-byte key", hooked.len());
+                eprintln!("LLDB hook captured {} 32-byte keys", hooked.len());
                 // 只对仍缺的 DB 做匹配，加快速度
                 let missing_salts: Vec<(String, String)> = still_missing
                     .iter()
@@ -249,17 +249,17 @@ pub fn scan_keys_with_options(
                 entries = by_name.into_values().collect();
             }
             Err(e) => {
-                eprintln!("LLDB hook 未成功: {:#}", e);
+                eprintln!("LLDB hook failed: {:#}", e);
                 eprintln!(
-                    "提示: 确认已安装 Xcode CLT（xcode-select --install），\n\
-                     Hardened Runtime 包请使用 sudo；ad-hoc 包可直接用户态 lldb。"
+                    "Tip: make sure Xcode CLT is installed (xcode-select --install);\n\
+                     use sudo for Hardened Runtime builds; ad-hoc builds work with user-mode lldb."
                 );
             }
         }
     }
 
     eprintln!(
-        "最终匹配到 {}/{} 个数据库密钥",
+        "Final match: {}/{} database keys",
         entries.len(),
         db_salts.len()
     );
@@ -267,10 +267,10 @@ pub fn scan_keys_with_options(
     // 兼容旧返回路径：若完全失败且非 root，给出清晰错误
     if entries.is_empty() && !is_root && !matches!(signature, SignatureKind::AdHoc) {
         bail!(
-            "未能提取任何密钥。请从本机 Terminal 运行：\n\
+            "No keys extracted. Run from a local Terminal:\n\
              {}\n\
-             等待期间在微信中打开/滚动相关聊天以触发冷分片加载。\n\
-             SIP 无需关闭；不要预先 ad-hoc 重签官方包。",
+             While waiting, open/scroll the relevant chats in WeChat to trigger cold shard loading.\n\
+             SIP does not need to be disabled; do not ad-hoc re-sign the official build beforehand.",
             crate::config::RECOMMENDED_KEY_EXTRACT_HINT
         );
     }
@@ -287,21 +287,21 @@ fn obtain_task_port(pid: libc::pid_t, signature: SignatureKind) -> Result<mach_p
     }
     let advice = match signature {
         SignatureKind::AdHoc => {
-            "当前 WeChat 已是 ad-hoc，重复签名没有帮助。请确认命令来自本机 GUI \
-             Terminal，并在系统提示时允许「开发者工具」权限。"
+            "WeChat is already ad-hoc signed; re-signing will not help. Make sure the command runs from a local GUI \
+             Terminal, and allow the 'Developer Tools' permission when prompted."
         }
         SignatureKind::HardenedRuntime => {
-            "当前 WeChat 是官方 Hardened Runtime 签名。请从本机 GUI Terminal \
-             重试，并在「隐私与安全性 → 开发者工具」中允许该 Terminal。只有 SSH \
-             等无 GUI 场景仍被拒绝时，才考虑有副作用的 ad-hoc 重签。"
+            "WeChat has the official Hardened Runtime signature. Retry from a local GUI Terminal \
+             and allow that Terminal in 'Privacy & Security → Developer Tools'. Only if it is still denied in \
+             headless cases like SSH should you consider ad-hoc re-signing, which has side effects."
         }
         SignatureKind::Unknown => {
-            "请从本机 GUI Terminal 重试，并检查「隐私与安全性 → 开发者工具」权限。"
+            "Retry from a local GUI Terminal and check the 'Privacy & Security → Developer Tools' permission."
         }
     };
     bail!(
-        "task_for_pid 失败 (kr={})。\n{}\n\
-         SIP 无需关闭；wx-cli 不会自动修改 WeChat.app。",
+        "task_for_pid failed (kr={}).\n{}\n\
+         SIP does not need to be disabled; wx-cli never modifies WeChat.app automatically.",
         kr,
         advice
     )
@@ -469,7 +469,7 @@ fn scan_region(
 /// 脚本在 `seconds` 后自动 `process detach`，避免强杀 lldb 把微信留在 SIGSTOP。
 fn hook_keys_via_lldb(pid: libc::pid_t, seconds: u64, allow_user: bool) -> Result<Vec<String>> {
     let lldb = find_lldb()
-        .context("找不到 lldb。请安装 Xcode Command Line Tools：xcode-select --install")?;
+        .context("lldb not found. Install Xcode Command Line Tools: xcode-select --install")?;
 
     let tmp_dir = std::env::temp_dir().join(format!("wx-cli-hook-{}", std::process::id()));
     std::fs::create_dir_all(&tmp_dir)?;
@@ -502,7 +502,7 @@ fn hook_keys_via_lldb(pid: libc::pid_t, seconds: u64, allow_user: bool) -> Resul
     )?;
 
     if !allow_user && unsafe { libc::geteuid() } != 0 {
-        bail!("LLDB hook 需要 root 或 ad-hoc 签名的 WeChat");
+        bail!("LLDB hook requires root or an ad-hoc signed WeChat");
     }
 
     let mut cmd = Command::new(&lldb);
@@ -519,8 +519,8 @@ fn hook_keys_via_lldb(pid: libc::pid_t, seconds: u64, allow_user: bool) -> Resul
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::piped());
 
-    eprintln!("LLDB: {} -p {} （等待 {}s，到期自动 detach）", lldb.display(), pid, seconds);
-    let mut child = cmd.spawn().context("启动 lldb 失败")?;
+    eprintln!("LLDB: {} -p {} (waiting {}s, auto-detach on expiry)", lldb.display(), pid, seconds);
+    let mut child = cmd.spawn().context("Failed to start lldb")?;
 
     // 多等几秒给 detach/quit 收尾
     let wait_budget = Duration::from_secs(seconds + 15);
@@ -541,7 +541,7 @@ fn hook_keys_via_lldb(pid: libc::pid_t, seconds: u64, allow_user: bool) -> Resul
                 }
                 let _ = std::fs::remove_dir_all(&tmp_dir);
                 bail!(
-                    "lldb 退出异常: {} {}",
+                    "lldb exited abnormally: {} {}",
                     status,
                     stderr.chars().take(400).collect::<String>()
                 );
@@ -549,7 +549,7 @@ fn hook_keys_via_lldb(pid: libc::pid_t, seconds: u64, allow_user: bool) -> Resul
             break;
         }
         if started.elapsed() > wait_budget {
-            eprintln!("LLDB 超时，尝试终止…");
+            eprintln!("LLDB timed out, terminating…");
             let _ = child.kill();
             let _ = child.wait();
             break;

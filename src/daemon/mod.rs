@@ -47,9 +47,9 @@ pub(crate) fn collect_db_keys(
 ///
 /// 当 WX_DAEMON_MODE 环境变量设置时，main() 调用此函数
 pub fn run() {
-    let rt = tokio::runtime::Runtime::new().expect("无法创建 tokio runtime");
+    let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
     if let Err(e) = rt.block_on(async_run()) {
-        eprintln!("[daemon] 启动失败: {}", e);
+        eprintln!("[daemon] Startup failed: {}", e);
         std::process::exit(1);
     }
 }
@@ -65,7 +65,7 @@ async fn async_run() -> Result<()> {
     // 注册 SIGTERM / SIGINT 处理
     setup_signal_handler().await;
 
-    eprintln!("[daemon] wx-daemon 启动 (PID {})", pid);
+    eprintln!("[daemon] wx-daemon started (PID {})", pid);
 
     // 加载配置
     let cfg = config::load_config()?;
@@ -74,10 +74,10 @@ async fn async_run() -> Result<()> {
     // 加载密钥
     let keys_content = tokio::fs::read_to_string(&cfg.keys_file)
         .await
-        .map_err(|e| anyhow::anyhow!("读取密钥文件 {:?} 失败: {}", cfg.keys_file, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read keys file {:?}: {}", cfg.keys_file, e))?;
     let keys_raw: serde_json::Value = serde_json::from_str(&keys_content)?;
     let all_keys = extract_keys(&keys_raw);
-    eprintln!("[daemon] 密钥数量: {}", all_keys.len());
+    eprintln!("[daemon] Key count: {}", all_keys.len());
     warn_unknown_shards(&cfg.db_dir, &all_keys);
 
     // 初始化 DbCache
@@ -88,9 +88,9 @@ async fn async_run() -> Result<()> {
     let biz_msg_db_keys = collect_db_keys(&all_keys, is_biz_msg_db_key);
 
     // 预热：加载联系人 + 解密 session.db
-    eprintln!("[daemon] 预热...");
+    eprintln!("[daemon] Warming up...");
     let names_raw = query::load_names(&*db).await.unwrap_or_else(|e| {
-        eprintln!("[daemon] 加载联系人失败: {}", e);
+        eprintln!("[daemon] Failed to load contacts: {}", e);
         query::Names {
             map: HashMap::new(),
             md5_to_uname: HashMap::new(),
@@ -105,7 +105,7 @@ async fn async_run() -> Result<()> {
 
     let _ = db.get("session/session.db").await;
     let _ = db.get("sns/sns.db").await;
-    eprintln!("[daemon] 预热完成，联系人 {} 个", names.map.len());
+    eprintln!("[daemon] Warm-up done, {} contacts", names.map.len());
 
     // 包一层内部 Arc：IPC 请求取 guard 后只做 Arc::clone（O(1)），
     // 避免每次请求都全量 clone 几千个联系人的 HashMap。
@@ -140,7 +140,7 @@ fn warn_unknown_shards(db_dir: &std::path::Path, all_keys: &HashMap<String, Stri
         return;
     }
     eprintln!(
-        "[wx] 警告：磁盘上发现 daemon 不认识的分片 {}，结果可能不完整；{}",
+        "[wx] Warning: found shards on disk unknown to the daemon: {}; results may be incomplete; {}",
         missing.join(", "),
         crate::config::RECOMMENDED_KEY_EXTRACT_HINT
     );
@@ -183,8 +183,8 @@ async fn setup_signal_handler() {
     #[cfg(unix)]
     tokio::spawn(async move {
         use tokio::signal::unix::{signal, SignalKind};
-        let mut term = signal(SignalKind::terminate()).expect("无法监听 SIGTERM");
-        let mut int = signal(SignalKind::interrupt()).expect("无法监听 SIGINT");
+        let mut term = signal(SignalKind::terminate()).expect("failed to listen for SIGTERM");
+        let mut int = signal(SignalKind::interrupt()).expect("failed to listen for SIGINT");
         tokio::select! {
             _ = term.recv() => {},
             _ = int.recv() => {},

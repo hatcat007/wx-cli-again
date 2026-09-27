@@ -71,7 +71,7 @@ pub fn cmd_watch(interval_ms: u64, limit: usize, opts: OutputOpts) -> Result<()>
     let mut state = load_state();
     let mut last_mtime = session_source_mtime();
     eprintln!(
-        "watching session.db(+wal) (poll {}ms). Ctrl+C 退出…",
+        "watching session.db(+wal) (poll {}ms). Ctrl+C to quit…",
         interval.as_millis()
     );
 
@@ -89,7 +89,7 @@ pub fn cmd_watch(interval_ms: u64, limit: usize, opts: OutputOpts) -> Result<()>
                 .filter_map(|(k, v)| v.as_i64().map(|t| (k.clone(), t)))
                 .collect();
             save_state(&state);
-            eprintln!("已建立 baseline（{} 会话），等待新消息…", state.len());
+            eprintln!("Baseline set ({} sessions), waiting for new messages…", state.len());
         }
     }
 

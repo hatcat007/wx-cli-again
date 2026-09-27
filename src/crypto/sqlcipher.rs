@@ -12,17 +12,17 @@ use std::path::Path;
 /// 成功后会探测 `sqlite_master` 校验密钥正确。
 pub fn open_encrypted_readonly(path: &Path, key_hex: &str) -> Result<Connection> {
     if key_hex.len() != 64 || !key_hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        bail!("SQLCipher key 必须是 64 位 hex，实际 len={}", key_hex.len());
+        bail!("SQLCipher key must be 64 hex characters, got len={}", key_hex.len());
     }
     if !path.exists() {
-        bail!("数据库不存在: {}", path.display());
+        bail!("Database does not exist: {}", path.display());
     }
 
     let conn = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
-    .with_context(|| format!("打开加密 DB 失败: {}", path.display()))?;
+    .with_context(|| format!("Failed to open encrypted DB: {}", path.display()))?;
 
     // Prefer raw key only (matches our page-AES keys). Fall back to key||salt
     // for SQLCipher builds that expect the salt-suffixed form.
@@ -36,9 +36,9 @@ pub fn open_encrypted_readonly(path: &Path, key_hex: &str) -> Result<Connection>
     if salt_hex.len() == 32 {
         let key_salt = format!("x'{}{}'", key_hex.to_lowercase(), salt_hex);
         try_apply_key(&conn, &key_salt)
-            .with_context(|| format!("SQLCipher 密钥不匹配: {}", path.display()))?;
+            .with_context(|| format!("SQLCipher key mismatch: {}", path.display()))?;
     } else {
-        bail!("SQLCipher 密钥不匹配: {}", path.display());
+        bail!("SQLCipher key mismatch: {}", path.display());
     }
 
     let _ = conn.execute_batch("PRAGMA query_only = ON");

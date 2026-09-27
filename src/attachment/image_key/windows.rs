@@ -58,7 +58,7 @@ impl ImageKeyProvider for WindowsImageKeyProvider {
         let configured_db_dir = self
             .configured_db_dir
             .as_ref()
-            .map_err(|err| anyhow::anyhow!("读取 config.db_dir 失败: {}", err))?;
+            .map_err(|err| anyhow::anyhow!("Failed to read config.db_dir: {}", err))?;
         let db_dir = configured_db_dir_for_wxid(configured_db_dir, wxid);
         let attach_dir = attach_root_for_db_dir(&db_dir);
         let key = derive_key_for_paths(&attach_dir)?;
@@ -70,16 +70,16 @@ impl ImageKeyProvider for WindowsImageKeyProvider {
 fn derive_key_for_paths(attach_dir: &std::path::Path) -> Result<ImageKeyMaterial> {
     let templates = find_v2_template_ciphertexts(attach_dir, 3, 64)?;
     if templates.is_empty() {
-        bail!("在 {} 下找不到 V2 模板文件", attach_dir.display());
+        bail!("No V2 template file found under {}", attach_dir.display());
     }
     let xor_key = derive_xor_key_from_v2_dat(attach_dir, 10, 3)?
         .map(|(key, _, _)| key)
         .unwrap_or(0x88);
 
-    let pid = find_wechat_pid().context("找不到 Weixin.exe 进程，请确认微信正在运行")?;
+    let pid = find_wechat_pid().context("Weixin.exe process not found; make sure WeChat is running")?;
     let process = unsafe {
         OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid)
-            .context("OpenProcess 失败，请以管理员权限运行")?
+            .context("OpenProcess failed; run as administrator")?
     };
 
     let aes_key = scan_memory_for_key(process, &templates);
@@ -154,7 +154,7 @@ fn scan_memory_for_key(process: HANDLE, templates: &[[u8; 16]]) -> Result<[u8; 1
         }
     }
 
-    bail!("Windows 进程内存里没有找到可验证的 V2 AES key")
+    bail!("No verifiable V2 AES key found in Windows process memory")
 }
 
 fn scan_region(

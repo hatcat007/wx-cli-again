@@ -232,7 +232,7 @@ pub async fn load_names(db: &DbCache) -> Result<Names> {
     if let Some(p) = path {
         let p2 = p.clone();
         let rows: Vec<(String, String, String, i64)> = tokio::task::spawn_blocking(move || {
-            let conn = Connection::open(&p2).context("打开 contact.db 失败")?;
+            let conn = Connection::open(&p2).context("Failed to open contact.db")?;
             let mut stmt =
                 conn.prepare("SELECT username, nick_name, remark, verify_flag FROM contact")?;
             let rows = stmt
@@ -287,7 +287,7 @@ pub async fn q_sessions(
     let path = db
         .get("session/session.db")
         .await?
-        .context("无法解密 session.db")?;
+        .context("Cannot decrypt session.db")?;
 
     let path2 = path.clone();
     let limit_val = limit;
@@ -398,7 +398,7 @@ pub async fn q_history(
     debug_source: bool,
 ) -> Result<Value> {
     let username =
-        resolve_username(chat, names).with_context(|| format!("找不到联系人: {}", chat))?;
+        resolve_username(chat, names).with_context(|| format!("Contact not found: {}", chat))?;
     let display = names.display(&username);
     let chat_type = chat_type_of(&username, names);
     let is_group = chat_type == "group";
@@ -418,7 +418,7 @@ pub async fn q_history(
     // 按时间路由分片：避免为「最近 N 条」解密全部 message_*.db
     let (shards, scanned) = find_msg_shards(db, names, &username, eff_since, eff_until).await?;
     if shards.is_empty() {
-        anyhow::bail!("找不到 {} 的消息记录", display);
+        anyhow::bail!("No messages found for {}", display);
     }
 
     let mut all_msgs: Vec<Value> = Vec::new();
@@ -978,7 +978,7 @@ pub async fn q_search(
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!("[search] FTS 路径失败，回退全库扫描: {:#}", e);
+                eprintln!("[search] FTS path failed, falling back to full scan: {:#}", e);
             }
         }
     }
@@ -2271,17 +2271,17 @@ pub fn type_id(t: i64) -> String {
 pub fn fmt_type(t: i64) -> String {
     let base = type_code(t);
     match base {
-        1 => "文本".into(),
-        3 => "图片".into(),
-        34 => "语音".into(),
-        42 => "名片".into(),
-        43 => "视频".into(),
-        47 => "表情".into(),
-        48 => "位置".into(),
-        49 => "链接/文件".into(),
-        50 => "通话".into(),
-        10000 => "系统".into(),
-        10002 => "撤回".into(),
+        1 => "text".into(),
+        3 => "image".into(),
+        34 => "voice".into(),
+        42 => "card".into(),
+        43 => "video".into(),
+        47 => "sticker".into(),
+        48 => "location".into(),
+        49 => "link/file".into(),
+        50 => "call".into(),
+        10000 => "system".into(),
+        10002 => "revoke".into(),
         _ => format!("type={}", base),
     }
 }
@@ -2314,13 +2314,13 @@ pub fn attach_type_fields(msg: &mut Value, local_type: i64, content: &str) {
 fn fmt_content(local_id: i64, local_type: i64, content: &str, is_group: bool) -> String {
     let base = (local_type as u64 & 0xFFFFFFFF) as i64;
     match base {
-        3 => return format!("[图片] local_id={}", local_id),
-        34 => return "[语音]".into(),
-        43 => return "[视频]".into(),
-        47 => return "[表情]".into(),
-        50 => return "[通话]".into(),
-        10000 => return parse_sysmsg(content).unwrap_or_else(|| "[系统消息]".into()),
-        10002 => return parse_revoke(content).unwrap_or_else(|| "[撤回了一条消息]".into()),
+        3 => return format!("[Image] local_id={}", local_id),
+        34 => return "[Voice]".into(),
+        43 => return "[Video]".into(),
+        47 => return "[Sticker]".into(),
+        50 => return "[Call]".into(),
+        10000 => return parse_sysmsg(content).unwrap_or_else(|| "[System message]".into()),
+        10002 => return parse_revoke(content).unwrap_or_else(|| "[Recalled a message]".into()),
         _ => {}
     }
 
@@ -2344,11 +2344,11 @@ fn parse_revoke(xml: &str) -> Option<String> {
     let inner = extract_xml_text(xml, "content")?;
     // 有时 content 是 "xxx recalled a message" 英文，有时是中文
     if inner.is_empty() {
-        return Some("[撤回了一条消息]".into());
+        return Some("[Recalled a message]".into());
     }
     // 尝试简化：如果是 XML 格式的撤回内容，直接显示摘要
     Some(format!(
-        "[撤回] {}",
+        "[Recalled] {}",
         inner.chars().take(30).collect::<String>()
     ))
 }
@@ -2359,17 +2359,17 @@ fn parse_sysmsg(xml: &str) -> Option<String> {
     // 尝试提取 content 标签
     if let Some(s) = extract_xml_text(xml, "content") {
         if !s.is_empty() {
-            return Some(format!("[系统] {}", s.chars().take(50).collect::<String>()));
+            return Some(format!("[System] {}", s.chars().take(50).collect::<String>()));
         }
     }
     // 纯文本系统消息（无 XML）
     if !xml.starts_with('<') {
         return Some(format!(
-            "[系统] {}",
+            "[System] {}",
             xml.chars().take(50).collect::<String>()
         ));
     }
-    Some("[系统消息]".into())
+    Some("[System message]".into())
 }
 
 fn parse_appmsg(text: &str) -> Option<String> {
@@ -2396,9 +2396,9 @@ fn parse_appmsg_legacy(text: &str) -> Option<String> {
     let atype = extract_xml_text(text, "type").unwrap_or_default();
     match atype.as_str() {
         "6" => Some(if !title.is_empty() {
-            format!("[文件] {}", title)
+            format!("[File] {}", title)
         } else {
-            "[文件]".into()
+            "[File]".into()
         }),
         "57" => {
             let ref_content = quote_refermsg_content(text)
@@ -2407,9 +2407,9 @@ fn parse_appmsg_legacy(text: &str) -> Option<String> {
                 })
                 .unwrap_or_default();
             let quote = if !title.is_empty() {
-                format!("[引用] {}", title)
+                format!("[Quote] {}", title)
             } else {
-                "[引用]".into()
+                "[Quote]".into()
             };
             if !ref_content.is_empty() {
                 Some(format!("{}\n  \u{21b3} {}", quote, ref_content))
@@ -2418,14 +2418,14 @@ fn parse_appmsg_legacy(text: &str) -> Option<String> {
             }
         }
         "33" | "36" | "44" => Some(if !title.is_empty() {
-            format!("[小程序] {}", title)
+            format!("[Mini program] {}", title)
         } else {
-            "[小程序]".into()
+            "[Mini program]".into()
         }),
         _ => Some(if !title.is_empty() {
-            format!("[链接] {}", title)
+            format!("[Link] {}", title)
         } else {
-            "[链接/文件]".into()
+            "[Link/File]".into()
         }),
     }
 }
@@ -2447,9 +2447,9 @@ fn format_file_appmsg<'a, 'input>(appmsg: Node<'a, 'input>, title: &str) -> Stri
     }
 
     let base = if !title.is_empty() {
-        format!("[文件] {}", title)
+        format!("[File] {}", title)
     } else {
-        "[文件]".into()
+        "[File]".into()
     };
     if meta.is_empty() {
         base
@@ -2461,12 +2461,12 @@ fn format_file_appmsg<'a, 'input>(appmsg: Node<'a, 'input>, title: &str) -> Stri
 fn format_record_appmsg<'a, 'input>(appmsg: Node<'a, 'input>, title: &str) -> String {
     let items = record_item_lines(appmsg);
     let mut header = if !title.is_empty() {
-        format!("[合并聊天记录] {}", title)
+        format!("[Forwarded chat history] {}", title)
     } else {
-        "[合并聊天记录]".into()
+        "[Forwarded chat history]".into()
     };
     if !items.is_empty() {
-        header.push_str(&format!(" ({}条)", items.len()));
+        header.push_str(&format!(" ({} messages)", items.len()));
     }
 
     let mut lines = vec![header];
@@ -2479,7 +2479,7 @@ fn format_record_appmsg<'a, 'input>(appmsg: Node<'a, 'input>, title: &str) -> St
             lines.push(format!("  - {}", item));
         }
         if items.len() > 10 {
-            lines.push(format!("  - ... 还有{}条", items.len() - 10));
+            lines.push(format!("  - ... {} more", items.len() - 10));
         }
     }
     lines.join("\n")
@@ -2538,12 +2538,12 @@ fn first_child_text<'a, 'input>(node: Node<'a, 'input>, tags: &[&str]) -> Option
 
 fn record_datatype_label(datatype: &str) -> Option<&'static str> {
     match datatype {
-        "1" => Some("[文本]"),
-        "2" => Some("[图片]"),
-        "3" => Some("[语音]"),
-        "4" => Some("[视频]"),
-        "6" => Some("[文件]"),
-        "17" => Some("[链接]"),
+        "1" => Some("[Text]"),
+        "2" => Some("[Image]"),
+        "3" => Some("[Voice]"),
+        "4" => Some("[Video]"),
+        "6" => Some("[File]"),
+        "17" => Some("[Link]"),
         _ => None,
     }
 }
@@ -2580,11 +2580,11 @@ fn quote_content_text(raw: &str, max_chars: usize) -> Option<String> {
 fn quote_refermsg_type_label(t: &str) -> Option<&'static str> {
     match t {
         "1" => None,
-        "3" => Some("[图片]"),
-        "34" => Some("[语音]"),
-        "43" => Some("[视频]"),
-        "47" => Some("[表情]"),
-        "49" => Some("[链接/文件]"),
+        "3" => Some("[Image]"),
+        "34" => Some("[Voice]"),
+        "43" => Some("[Video]"),
+        "47" => Some("[Sticker]"),
+        "49" => Some("[Link/File]"),
         _ => None,
     }
 }
@@ -2725,7 +2725,7 @@ mod type_fields_tests {
 
     #[test]
     fn attach_type_fields_sets_agent_keys() {
-        let mut msg = json!({"type": "链接/文件"});
+        let mut msg = json!({"type": "link/file"});
         let xml = r#"wxid_x:\n<msg><appmsg><type>6</type></appmsg></msg>"#;
         attach_type_fields(&mut msg, 49, xml);
         assert_eq!(msg["type_code"], 49);
@@ -2809,7 +2809,7 @@ mod appmsg_tests {
         assert_eq!(
             parse_appmsg(xml).as_deref(),
             Some(
-                "[合并聊天记录] 群聊的聊天记录 (2条)\n  - 张三: 早上好 & coffee\n  - 李四: [图片]"
+                "[Forwarded chat history] 群聊的聊天记录 (2 messages)\n  - 张三: 早上好 & coffee\n  - 李四: [图片]"
             )
         );
     }
@@ -2832,7 +2832,7 @@ mod appmsg_tests {
 
         assert_eq!(
             parse_appmsg(xml).as_deref(),
-            Some("[文件] report.pdf (1.5 KB, pdf)")
+            Some("[File] report.pdf (1.5 KB, pdf)")
         );
     }
 
@@ -2855,7 +2855,7 @@ mod appmsg_tests {
 
         assert_eq!(
             parse_appmsg(xml).as_deref(),
-            Some("[引用] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
+            Some("[Quote] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
         );
     }
 
@@ -2910,7 +2910,7 @@ mod appmsg_tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(
             rows[0]["content"].as_str(),
-            Some("[引用] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
+            Some("[Quote] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
         );
     }
 
@@ -3148,7 +3148,7 @@ mod appmsg_tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(
             rows[0]["content"].as_str(),
-            Some("[引用] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
+            Some("[Quote] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
         );
     }
 
@@ -3200,7 +3200,7 @@ mod appmsg_tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(
             rows[0]["content"].as_str(),
-            Some("[引用] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
+            Some("[Quote] 我也没有用ai啊\n  \u{21b3} 不再熬夜: 昨天用 claude 爬小红书数据来着")
         );
     }
 
@@ -3244,7 +3244,7 @@ pub async fn q_unread(
     let path = db
         .get("session/session.db")
         .await?
-        .context("无法解密 session.db")?;
+        .context("Cannot decrypt session.db")?;
 
     // 归一化 filter：小写 + 去除别名。返回 None 代表"不过滤"。
     let filter_set: Option<std::collections::HashSet<&'static str>> = filter.and_then(|v| {
@@ -3387,10 +3387,10 @@ pub async fn q_unread(
 /// 若表不存在则退化为从消息记录聚合有发言记录的成员
 pub async fn q_members(db: &DbCache, names: &Names, chat: &str) -> Result<Value> {
     let username =
-        resolve_username(chat, names).with_context(|| format!("找不到联系人: {}", chat))?;
+        resolve_username(chat, names).with_context(|| format!("Contact not found: {}", chat))?;
 
     if !username.contains("@chatroom") {
-        anyhow::bail!("'{}' 不是群聊，无法查看群成员", names.display(&username));
+        anyhow::bail!("'{}' is not a group chat; cannot list members", names.display(&username));
     }
 
     let display = names.display(&username);
@@ -3611,7 +3611,7 @@ pub async fn q_new_messages(
     let session_path = db
         .get("session/session.db")
         .await?
-        .context("无法解密 session.db")?;
+        .context("Cannot decrypt session.db")?;
 
     let all_sessions: Vec<(String, i64)> = tokio::task::spawn_blocking(move || {
         let conn = Connection::open(&session_path)?;
@@ -3874,7 +3874,7 @@ pub async fn q_favorites(
     let path = db
         .get("favorite/favorite.db")
         .await?
-        .context("找不到 favorite.db，请确认微信数据目录")?;
+        .context("favorite.db not found; check the WeChat data directory")?;
 
     let rows: Vec<Value> = tokio::task::spawn_blocking(move || {
         let conn = Connection::open(&path)?;
@@ -3928,12 +3928,12 @@ pub async fn q_favorites(
             .filter_map(|r| r.ok())
             .map(|(local_id, ftype, ts, content, fromusr, chatname)| {
                 let type_str = match ftype {
-                    1 => "文本",
-                    2 => "图片",
-                    5 => "文章",
-                    19 => "名片",
-                    20 => "视频",
-                    _ => "其他",
+                    1 => "text",
+                    2 => "image",
+                    5 => "article",
+                    19 => "card",
+                    20 => "video",
+                    _ => "other",
                 };
                 // 安全截断（按 Unicode 字符而非字节）
                 let preview: String = content.chars().take(100).collect();
@@ -3984,14 +3984,14 @@ pub async fn q_stats(
     debug_source: bool,
 ) -> Result<Value> {
     let username =
-        resolve_username(chat, names).with_context(|| format!("找不到联系人: {}", chat))?;
+        resolve_username(chat, names).with_context(|| format!("Contact not found: {}", chat))?;
     let display = names.display(&username);
     let chat_type = chat_type_of(&username, names);
     let is_group = chat_type == "group";
 
     let (shards, scanned) = find_msg_shards(db, names, &username, None, None).await?;
     if shards.is_empty() {
-        anyhow::bail!("找不到 {} 的消息记录", display);
+        anyhow::bail!("No messages found for {}", display);
     }
 
     // 跨所有分片 DB 累计统计
@@ -4182,7 +4182,7 @@ pub async fn q_sns_notifications(
     until: Option<i64>,
     include_read: bool,
 ) -> Result<Value> {
-    let path = db.get("sns/sns.db").await?.context("无法解密 sns.db")?;
+    let path = db.get("sns/sns.db").await?.context("Cannot decrypt sns.db")?;
 
     let path2 = path.clone();
     type Row = (i64, i64, i64, i64, String, String, String);
@@ -4543,12 +4543,12 @@ pub async fn q_sns_feed(
     until: Option<i64>,
     user: Option<&str>,
 ) -> Result<Value> {
-    let path = db.get("sns/sns.db").await?.context("无法解密 sns.db")?;
+    let path = db.get("sns/sns.db").await?.context("Cannot decrypt sns.db")?;
 
     let limit = limit.min(SNS_MAX_LIMIT);
     let user_uname = match user {
         Some(q) => {
-            Some(resolve_username(q, names).with_context(|| format!("找不到联系人: {}", q))?)
+            Some(resolve_username(q, names).with_context(|| format!("Contact not found: {}", q))?)
         }
         None => None,
     };
@@ -4574,7 +4574,7 @@ pub async fn q_sns_feed(
             scanned += 1;
             if scanned > SNS_MAX_SCAN {
                 eprintln!(
-                    "[sns_feed] scan 超过硬上限 {}，结果可能不完整。建议加 --user / --since 缩小范围。",
+                    "[sns_feed] scan exceeded hard cap {}; results may be incomplete. Narrow it with --user / --since.",
                     SNS_MAX_SCAN
                 );
                 break;
@@ -4612,14 +4612,14 @@ pub async fn q_sns_search(
     user: Option<&str>,
 ) -> Result<Value> {
     if keyword.trim().is_empty() {
-        anyhow::bail!("搜索关键词不能为空");
+        anyhow::bail!("Search keyword cannot be empty");
     }
-    let path = db.get("sns/sns.db").await?.context("无法解密 sns.db")?;
+    let path = db.get("sns/sns.db").await?.context("Cannot decrypt sns.db")?;
 
     let limit = limit.min(SNS_MAX_LIMIT);
     let user_uname = match user {
         Some(q) => {
-            Some(resolve_username(q, names).with_context(|| format!("找不到联系人: {}", q))?)
+            Some(resolve_username(q, names).with_context(|| format!("Contact not found: {}", q))?)
         }
         None => None,
     };
@@ -4649,7 +4649,7 @@ pub async fn q_sns_search(
             scanned += 1;
             if scanned > SNS_MAX_SCAN {
                 eprintln!(
-                    "[sns_search] scan 超过硬上限 {}，结果可能不完整。建议缩小 keyword 或加 --user / --since。",
+                    "[sns_search] scan exceeded hard cap {}; results may be incomplete. Narrow the keyword or add --user / --since.",
                     SNS_MAX_SCAN
                 );
                 break;
@@ -4796,7 +4796,7 @@ pub async fn q_biz_articles(
     }
     if biz_paths.is_empty() {
         return Err(anyhow::anyhow!(
-            "无法解密任何 biz_message_*.db，请确认 all_keys.json 包含对应密钥"
+            "Cannot decrypt any biz_message_*.db; make sure all_keys.json has their keys"
         ));
     }
 
@@ -4806,7 +4806,7 @@ pub async fn q_biz_articles(
         let session_path = db
             .get("session/session.db")
             .await?
-            .context("无法解密 session.db")?;
+            .context("Cannot decrypt session.db")?;
         let session_path2 = session_path.clone();
         let unread_rows: Vec<String> = tokio::task::spawn_blocking(move || {
             let conn = Connection::open(&session_path2)?;
@@ -5048,7 +5048,7 @@ pub async fn q_attachments(
     use crate::attachment::{AttachmentId, AttachmentKind};
 
     let username =
-        resolve_username(chat, names).with_context(|| format!("找不到联系人: {}", chat))?;
+        resolve_username(chat, names).with_context(|| format!("Contact not found: {}", chat))?;
     let display = names.display(&username);
     let chat_type = chat_type_of(&username, names);
     let is_group = chat_type == "group";
@@ -5056,7 +5056,7 @@ pub async fn q_attachments(
     // 解析 kinds → 低 32 bit local_type 集合
     let kind_filters: Vec<(AttachmentKind, i64)> = parse_attachment_kinds(kinds.as_deref())?;
     if kind_filters.is_empty() {
-        anyhow::bail!("kinds 为空 — 当前至少传一种 image");
+        anyhow::bail!("kinds is empty — pass at least image");
     }
     let lo32_types: Vec<i64> = kind_filters.iter().map(|(_, t)| *t).collect();
     // local_type → AttachmentKind 反查（mask 完后定 kind）
@@ -5065,7 +5065,7 @@ pub async fn q_attachments(
 
     let (shards, scanned) = find_msg_shards(db, names, &username, None, None).await?;
     if shards.is_empty() {
-        anyhow::bail!("找不到 {} 的消息记录", display);
+        anyhow::bail!("No messages found for {}", display);
     }
 
     // 群聊需要 sender 显示名
@@ -5257,12 +5257,12 @@ pub async fn q_extract(
     };
 
     let id = AttachmentId::decode(attachment_id)
-        .context("解析 attachment_id 失败（不是合法 base64url(json)？）")?;
+        .context("Failed to parse attachment_id (not valid base64url(json)?)")?;
 
     let output_path = std::path::PathBuf::from(output);
     if output_path.exists() && !overwrite {
         anyhow::bail!(
-            "目标已存在：{}（加 --overwrite 覆盖）",
+            "Target already exists: {} (add --overwrite to replace)",
             output_path.display()
         );
     }
@@ -5270,7 +5270,7 @@ pub async fn q_extract(
         if !parent.as_os_str().is_empty() {
             tokio::fs::create_dir_all(parent)
                 .await
-                .with_context(|| format!("创建输出目录失败：{}", parent.display()))?;
+                .with_context(|| format!("Failed to create output directory: {}", parent.display()))?;
         }
     }
 
@@ -5278,13 +5278,13 @@ pub async fn q_extract(
     let resource_path = db
         .get("message/message_resource.db")
         .await?
-        .context("无法解密 message_resource.db（请确认 all_keys.json 包含该 DB 的密钥）")?;
+        .context("Cannot decrypt message_resource.db (make sure all_keys.json has its key)")?;
 
     // 2) 推 wxchat_base = db_dir.parent()，再拼 attach_root
     let wxchat_base = db
         .db_dir()
         .parent()
-        .ok_or_else(|| anyhow::anyhow!("db_dir 没有 parent，无法推断 xwechat_files 根目录"))?
+        .ok_or_else(|| anyhow::anyhow!("db_dir has no parent; cannot infer the xwechat_files root"))?
         .to_path_buf();
     let attach_root = resolver::attach_root_for(&wxchat_base);
 
@@ -5299,7 +5299,7 @@ pub async fn q_extract(
         let resolved = resolver::resolve_blocking(&id_for_task, &resource_path2, &attach_root2)?;
 
         let dat_bytes = std::fs::read(&resolved.dat_path)
-            .with_context(|| format!("读取 .dat 失败：{}", resolved.dat_path.display()))?;
+            .with_context(|| format!("Failed to read .dat: {}", resolved.dat_path.display()))?;
 
         // V2 image key — 平台相关。`ImageKeyMaterial` 同时给 aes_key + xor_key。
         // xor_key 不能硬编码 0x88：实测 macOS 真实账号上是 `uin & 0xff` 派生的（0xa2 等），
@@ -5320,7 +5320,7 @@ pub async fn q_extract(
                     Ok(km) => Some(km),
                     Err(e) => {
                         eprintln!(
-                            "[extract] image key 提取失败 (wxid={}): {} — V2 文件将无法解码",
+                            "[extract] image key extraction failed (wxid={}): {} — V2 files cannot be decoded",
                             wxid, e
                         );
                         None
@@ -5342,7 +5342,7 @@ pub async fn q_extract(
 
         // 写盘
         std::fs::write(&output_path2, &decoded.data)
-            .with_context(|| format!("写出文件失败：{}", output_path2.display()))?;
+            .with_context(|| format!("Failed to write file: {}", output_path2.display()))?;
 
         // 注意：不要在这里塞 `ok: true`。dispatch 会用 Response::ok(v) 包一层，
         // Response 的 `data: Value` 字段是 #[serde(flatten)] 写出的，本 payload
@@ -5381,10 +5381,10 @@ fn parse_attachment_kinds(
             "image" | "img" => (AttachmentKind::Image, 3),
             "voice" | "audio" | "video" | "file" => {
                 anyhow::bail!(
-                    "当前只支持 image 提取；video/file/voice 的资源路径与 decoder 还没接通"
+                    "Only image extraction is supported; video/file/voice resource paths and decoders are not wired up yet"
                 )
             }
-            other => anyhow::bail!("未知附件类型：{}（当前仅支持 image）", other),
+            other => anyhow::bail!("Unknown attachment type: {} (only image is supported)", other),
         };
         if seen.insert(kind.as_str()) {
             out.push((kind, t));

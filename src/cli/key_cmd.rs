@@ -7,9 +7,9 @@ use crate::config;
 use crate::scanner::{self, KeyEntry};
 
 pub fn cmd_key_list(json: bool, show_secrets: bool) -> Result<()> {
-    let cfg = config::load_config().context("请先 wx init")?;
+    let cfg = config::load_config().context("Run wx init first")?;
     let content = std::fs::read_to_string(&cfg.keys_file)
-        .with_context(|| format!("读取 {}", cfg.keys_file.display()))?;
+        .with_context(|| format!("Reading {}", cfg.keys_file.display()))?;
     let v: serde_json::Value = serde_json::from_str(&content)?;
     let mut known = Vec::new();
     let mut rows = Vec::new();
@@ -92,9 +92,9 @@ pub fn cmd_key_list(json: bool, show_secrets: bool) -> Result<()> {
             }))?
         );
     } else {
-        println!("密钥文件: {}", cfg.keys_file.display());
-        println!("数据目录: {}", cfg.db_dir.display());
-        println!("共 {} 个密钥", rows.len());
+        println!("Keys file: {}", cfg.keys_file.display());
+        println!("Data directory: {}", cfg.db_dir.display());
+        println!("{} keys total", rows.len());
         for r in &rows {
             println!(
                 "  {}  {}",
@@ -103,11 +103,11 @@ pub fn cmd_key_list(json: bool, show_secrets: bool) -> Result<()> {
             );
         }
         if !show_secrets {
-            println!("（完整 enc_key 需 --show-secrets）");
+            println!("(full enc_key requires --show-secrets)");
         }
         if !critical.is_empty() {
             println!(
-                "\n✗ 关键缺失 {} 个（影响聊天完整性）：",
+                "\n✗ {} critical missing (affects chat completeness):",
                 critical.len()
             );
             for m in &critical {
@@ -118,17 +118,17 @@ pub fn cmd_key_list(json: bool, show_secrets: bool) -> Result<()> {
                 );
             }
             println!(
-                "补齐：{}\n\
-                 等待期间在微信中打开相关聊天。",
+                "To fill in: {}\n\
+                 While waiting, open the relevant chats in WeChat.",
                 config::RECOMMENDED_KEY_EXTRACT
             );
         } else if !missing.is_empty() {
-            println!("\n✓ 关键聊天分片密钥齐全");
+            println!("\n✓ All critical chat shard keys present");
         } else {
-            println!("\n✓ 磁盘加密 DB 均已覆盖");
+            println!("\n✓ All encrypted DBs on disk are covered");
         }
         if !optional.is_empty() {
-            println!("旁路/可选缺失 {} 个：", optional.len());
+            println!("{} auxiliary/optional missing:", optional.len());
             for m in optional.iter().take(6) {
                 println!(
                     "  · {} ({})",
@@ -144,9 +144,9 @@ pub fn cmd_key_list(json: bool, show_secrets: bool) -> Result<()> {
 pub fn cmd_key_set(db_name: &str, enc_key: &str) -> Result<()> {
     let key = enc_key.trim().to_lowercase();
     if key.len() != 64 || !key.chars().all(|c| c.is_ascii_hexdigit()) {
-        bail!("enc_key 必须是 64 位 hex");
+        bail!("enc_key must be 64 hex characters");
     }
-    let cfg = config::load_config().context("请先 wx init")?;
+    let cfg = config::load_config().context("Run wx init first")?;
     let mut map: BTreeMap<String, serde_json::Value> = if cfg.keys_file.exists() {
         let content = std::fs::read_to_string(&cfg.keys_file)?;
         serde_json::from_str(&content).unwrap_or_default()
@@ -159,7 +159,7 @@ pub fn cmd_key_set(db_name: &str, enc_key: &str) -> Result<()> {
     if path.exists() {
         if let Some(raw) = scanner::decode_key_hex_pub(&key) {
             if !crate::crypto::validate_raw_key_for_db(&path, &raw) {
-                bail!("密钥无法解密 {}，请确认 hex 正确", rel);
+                bail!("Key cannot decrypt {}; check the hex is correct", rel);
             }
         }
     }
@@ -168,12 +168,12 @@ pub fn cmd_key_set(db_name: &str, enc_key: &str) -> Result<()> {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&cfg.keys_file, serde_json::to_string_pretty(&map)?)?;
-    println!("已写入密钥: {} → {}", rel, cfg.keys_file.display());
+    println!("Key written: {} → {}", rel, cfg.keys_file.display());
     // try hot-reload（会 invalidate 解密缓存）
     match super::transport::send(crate::ipc::Request::ReloadConfig) {
         Ok(resp) if resp.ok => {
             println!(
-                "已热重载 daemon 配置（keys={}）",
+                "Hot-reloaded daemon config (keys={})",
                 resp.data
                     .get("keys")
                     .and_then(|v| v.as_u64())
@@ -182,12 +182,12 @@ pub fn cmd_key_set(db_name: &str, enc_key: &str) -> Result<()> {
         }
         Ok(resp) => {
             eprintln!(
-                "daemon 热重载失败: {}；请执行 wx daemon restart",
+                "daemon hot reload failed: {}; run wx daemon restart",
                 resp.error.unwrap_or_default()
             );
         }
         Err(e) => {
-            eprintln!("daemon 未运行或无法连接（{}）；下次启动将加载新密钥", e);
+            eprintln!("daemon not running or unreachable ({}); new keys load on next start", e);
         }
     }
     Ok(())
@@ -195,13 +195,13 @@ pub fn cmd_key_set(db_name: &str, enc_key: &str) -> Result<()> {
 
 pub fn cmd_key_extract(hook_seconds: Option<u64>) -> Result<()> {
     println!(
-        "提取密钥（内存扫描 + 可选 LLDB hook；推荐：{}）…",
+        "Extracting keys (memory scan + optional LLDB hook; recommended: {})…",
         config::RECOMMENDED_KEY_EXTRACT
     );
     #[cfg(unix)]
     if unsafe { libc::geteuid() } != 0 {
         eprintln!(
-            "警告: 建议使用 {}，以便 task_for_pid 读取进程内存",
+            "Warning: use {} so task_for_pid can read process memory",
             config::RECOMMENDED_KEY_EXTRACT
         );
     }

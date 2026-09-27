@@ -68,7 +68,7 @@ pub fn scan_keys_with_options(db_dir: &Path, opts: ScanOptions<'_>) -> Result<Ve
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
         let _ = opts;
-        anyhow::bail!("当前平台不支持自动密钥扫描")
+        anyhow::bail!("Automatic key scanning is not supported on this platform")
     }
 }
 

@@ -33,7 +33,7 @@ async fn serve_unix(db: Arc<DbCache>, names: Arc<tokio::sync::RwLock<Arc<Names>>
         std::fs::set_permissions(&sock_path, std::fs::Permissions::from_mode(0o600))?;
     }
 
-    eprintln!("[server] 监听 {}", sock_path.display());
+    eprintln!("[server] Listening on {}", sock_path.display());
 
     loop {
         let (stream, _) = listener.accept().await?;
@@ -42,7 +42,7 @@ async fn serve_unix(db: Arc<DbCache>, names: Arc<tokio::sync::RwLock<Arc<Names>>
 
         tokio::spawn(async move {
             if let Err(e) = handle_connection_unix(stream, db2, names2).await {
-                eprintln!("[server] 连接处理错误: {}", e);
+                eprintln!("[server] Connection error: {}", e);
             }
         });
     }
@@ -66,7 +66,7 @@ async fn handle_connection_unix(
     let req: Request = match serde_json::from_str(&line) {
         Ok(r) => r,
         Err(e) => {
-            let resp = Response::err(format!("JSON 解析错误: {}", e));
+            let resp = Response::err(format!("JSON parse error: {}", e));
             writer.write_all(resp.to_json_line()?.as_bytes()).await?;
             return Ok(());
         }
@@ -90,7 +90,7 @@ async fn serve_windows(
     let opts = ListenerOptions::new().name(name);
     let listener = opts.create_tokio()?;
 
-    eprintln!("[server] 监听 \\\\.\\pipe\\wx-cli-daemon");
+    eprintln!("[server] Listening on \\\\.\\pipe\\wx-cli-daemon");
 
     loop {
         let conn = listener.accept().await?;
@@ -99,7 +99,7 @@ async fn serve_windows(
 
         tokio::spawn(async move {
             if let Err(e) = handle_connection_windows(conn, db2, names2).await {
-                eprintln!("[server] 连接处理错误: {}", e);
+                eprintln!("[server] Connection error: {}", e);
             }
         });
     }
@@ -122,7 +122,7 @@ async fn handle_connection_windows(
     let req: Request = match serde_json::from_str(&line) {
         Ok(r) => r,
         Err(e) => {
-            let resp = Response::err(format!("JSON 解析错误: {}", e));
+            let resp = Response::err(format!("JSON parse error: {}", e));
             writer.write_all(resp.to_json_line()?.as_bytes()).await?;
             return Ok(());
         }
@@ -406,7 +406,7 @@ async fn reload_config(
     let cfg = config::load_config()?;
     let keys_content = tokio::fs::read_to_string(&cfg.keys_file)
         .await
-        .map_err(|e| anyhow::anyhow!("读取密钥文件 {:?} 失败: {}", cfg.keys_file, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read keys file {:?}: {}", cfg.keys_file, e))?;
     let keys_raw: serde_json::Value = serde_json::from_str(&keys_content)?;
     let all_keys = extract_keys(&keys_raw);
     let key_count = all_keys.len();
@@ -416,7 +416,7 @@ async fn reload_config(
     let biz_msg_db_keys = collect_db_keys(&all_keys, is_biz_msg_db_key);
 
     let names_raw = super::query::load_names(db).await.unwrap_or_else(|e| {
-        eprintln!("[server] reload: 加载联系人失败: {}", e);
+        eprintln!("[server] reload: failed to load contacts: {}", e);
         Names {
             map: Default::default(),
             md5_to_uname: Default::default(),

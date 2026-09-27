@@ -8,7 +8,7 @@ pub const RECOMMENDED_KEY_EXTRACT: &str = "sudo wx key extract --hook-seconds 90
 
 /// 带冷分片操作说明的完整提示（一行或多行均可嵌入）。
 pub const RECOMMENDED_KEY_EXTRACT_HINT: &str =
-    "sudo wx key extract --hook-seconds 90（等待期间在微信中打开相关聊天以捕获冷分片密钥）";
+    "sudo wx key extract --hook-seconds 90 (open the relevant chats in WeChat while waiting to capture cold shard keys)";
 
 #[cfg(test)]
 mod recommended_cmd_tests {
@@ -38,9 +38,9 @@ pub struct Config {
 pub fn load_config() -> Result<Config> {
     let config_path = find_config_file()?;
     let content = std::fs::read_to_string(&config_path)
-        .with_context(|| format!("读取 config.json 失败: {}", config_path.display()))?;
+        .with_context(|| format!("Failed to read config.json: {}", config_path.display()))?;
     let raw: serde_json::Value =
-        serde_json::from_str(&content).with_context(|| "config.json 格式错误")?;
+        serde_json::from_str(&content).with_context(|| "config.json is malformed")?;
 
     let db_dir = raw
         .get("db_dir")

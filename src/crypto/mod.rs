@@ -34,14 +34,14 @@ type Aes256CbcDec = Decryptor<Aes256>;
 /// 返回解密后的完整页面（PAGE_SZ 字节）
 pub fn decrypt_page(enc_key: &[u8; 32], page_data: &[u8], pgno: u32) -> Result<Vec<u8>> {
     if page_data.len() < PAGE_SZ {
-        bail!("页面数据不足 {} 字节", PAGE_SZ);
+        bail!("Page data shorter than {} bytes", PAGE_SZ);
     }
 
     // IV 位于页面末尾 RESERVE_SZ 区域的前16字节
     let iv_offset = PAGE_SZ - RESERVE_SZ;
     let iv: &[u8; 16] = page_data[iv_offset..iv_offset + 16]
         .try_into()
-        .expect("IV 长度固定为 16");
+        .expect("IV length is fixed at 16");
 
     let mut result = vec![0u8; PAGE_SZ];
 
@@ -125,7 +125,7 @@ fn has_valid_sqlite_page1_header(page: &[u8]) -> bool {
 /// AES-256-CBC 解密（不去除 padding，SQLCipher 不使用 PKCS#7 padding）
 fn aes_cbc_decrypt(key: &[u8; 32], iv: &[u8; 16], data: &[u8]) -> Result<Vec<u8>> {
     if data.is_empty() || data.len() % 16 != 0 {
-        bail!("密文长度不是 AES 块大小的倍数: {}", data.len());
+        bail!("Ciphertext length is not a multiple of the AES block size: {}", data.len());
     }
     // 将 &[u8] 复制为 Block 数组，避免 unsafe from_raw_parts_mut
     let mut blocks: Vec<Block> = data.chunks_exact(16).map(Block::clone_from_slice).collect();
@@ -144,7 +144,7 @@ pub fn full_decrypt(db_path: &Path, out_path: &Path, enc_key: &[u8; 32]) -> Resu
     let mut input = std::fs::File::open(db_path)?;
     let file_size = input.metadata()?.len() as usize;
     if file_size == 0 {
-        bail!("数据库文件为空: {}", db_path.display());
+        bail!("Database file is empty: {}", db_path.display());
     }
 
     let mut output = std::fs::File::create(out_path)?;

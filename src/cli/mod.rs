@@ -36,16 +36,16 @@ fn clap_parse_msg_type(s: &str) -> std::result::Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-const MSG_TYPE_HELP: &str = "消息类型过滤 [text|image|voice|video|card|sticker|location|link|file|appmsg|call|system|revoke|数字code]";
+const MSG_TYPE_HELP: &str = "Message type filter [text|image|voice|video|card|sticker|location|link|file|appmsg|call|system|revoke|numeric code]";
 
-/// wx — 微信本地数据 CLI
+/// wx — WeChat local data CLI
 #[derive(Parser)]
-#[command(name = "wx", version = env!("CARGO_PKG_VERSION"), about = "wx — 微信本地数据 CLI")]
+#[command(name = "wx", version = env!("CARGO_PKG_VERSION"), about = "wx — WeChat local data CLI")]
 pub struct Cli {
-    /// 返回更重的 freshness/source 元数据（如 per-shard latest、cache modes）
+    /// Return heavier freshness/source metadata (e.g. per-shard latest, cache modes)
     #[arg(long, global = true)]
     with_meta: bool,
-    /// 在 meta 里暴露真实 shard 路径（调试用）
+    /// Expose real shard paths in meta (for debugging)
     #[arg(long, global = true, hide = true)]
     debug_source: bool,
     #[command(subcommand)]
@@ -54,302 +54,302 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// 初始化：检测数据目录并扫描加密密钥
+    /// Initialize: detect data directory and scan for encryption keys
     Init {
-        /// 强制重新扫描（与已有有效密钥合并，不会因部分失败而清空）
+        /// Force rescan (merged with existing valid keys; partial failure does not clear them)
         #[arg(long)]
         force: bool,
-        /// macOS: LLDB hook 等待秒数（0=禁用）。内存扫描配不齐冷分片时，
-        /// 在等待期间打开微信会话可捕获 per-DB AES key。
+        /// macOS: LLDB hook wait in seconds (0 = disabled). When the memory scan misses cold shards,
+        /// open WeChat chats during the wait to capture per-DB AES keys.
         #[arg(long)]
         hook_seconds: Option<u64>,
     },
-    /// 列出最近会话
+    /// List recent sessions
     Sessions {
-        /// 会话数量
+        /// Number of sessions
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 查看聊天记录
+    /// View chat history
     History {
-        /// 聊天对象名称（支持模糊匹配）
+        /// Chat name (fuzzy match)
         chat: String,
-        /// 消息数量
+        /// Number of messages
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 分页偏移（深 offset 慢；优先用 --after 游标）
+        /// Pagination offset (deep offsets are slow; prefer the --after cursor)
         #[arg(long, default_value = "0")]
         offset: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 游标：只返回比该时间更旧的消息（Unix 秒或日期；通常传上一页最旧 timestamp）
+        /// Cursor: only return messages older than this time (Unix seconds or date; usually the oldest timestamp of the previous page)
         #[arg(long)]
         after: Option<String>,
-        /// 游标：只返回比该时间更新的消息
+        /// Cursor: only return messages newer than this time
         #[arg(long)]
         before: Option<String>,
         #[arg(long = "type", value_name = "TYPE", help = MSG_TYPE_HELP, value_parser = clap_parse_msg_type)]
         msg_type: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 搜索消息
+    /// Search messages
     Search {
-        /// 搜索关键词
+        /// Search keyword
         keyword: String,
-        /// 限定聊天（可多次指定）
+        /// Restrict to chat (can be repeated)
         #[arg(long = "in", value_name = "CHAT")]
         chats: Vec<String>,
-        /// 结果数量
+        /// Number of results
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
         #[arg(long = "type", value_name = "TYPE", help = MSG_TYPE_HELP, value_parser = clap_parse_msg_type)]
         msg_type: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 查看联系人
+    /// View contacts
     Contacts {
-        /// 按名字过滤
+        /// Filter by name
         #[arg(short = 'q', long)]
         query: Option<String>,
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 导出聊天记录到文件
+    /// Export chat history to a file
     Export {
-        /// 聊天对象名称
+        /// Chat name
         chat: String,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 最多导出条数
+        /// Maximum messages to export
         #[arg(short = 'n', long, default_value = "500")]
         limit: usize,
-        /// 输出格式 [markdown|txt|json|yaml]
+        /// Output format [markdown|txt|json|yaml]
         #[arg(short = 'f', long, default_value = "markdown", value_parser = ["markdown", "txt", "json", "yaml"])]
         format: String,
-        /// 输出文件（默认 stdout）
+        /// Output file (default stdout)
         #[arg(short = 'o', long)]
         output: Option<String>,
     },
-    /// 显示有未读消息的会话
+    /// Show sessions with unread messages
     Unread {
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
-        /// 按会话类型过滤，逗号分隔。示例：--filter private,group 只看真人的未读
+        /// Filter by session type, comma-separated. Example: --filter private,group shows only unread from real people
         #[arg(long, value_name = "TYPES", value_delimiter = ',',
               value_parser = ["all", "private", "group", "official", "folded"])]
         filter: Vec<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 查看群成员
+    /// View group members
     Members {
-        /// 群聊名称（支持模糊匹配）
+        /// Group name (fuzzy match)
         chat: String,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 获取自上次检查以来的新消息
+    /// Get new messages since the last check
     NewMessages {
-        /// 显示数量上限
+        /// Maximum number to show
         #[arg(short = 'n', long, default_value = "200")]
         limit: usize,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 聊天统计分析
+    /// Chat statistics
     Stats {
-        /// 聊天对象名称（支持模糊匹配）
+        /// Chat name (fuzzy match)
         chat: String,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 查看微信收藏内容
+    /// View WeChat favorites
     Favorites {
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 类型过滤 [text|image|article|card|video]
+        /// Type filter [text|image|article|card|video]
         #[arg(long = "type", value_name = "TYPE",
               value_parser = ["text","image","article","card","video"])]
         fav_type: Option<String>,
-        /// 内容关键词搜索
+        /// Search content by keyword
         #[arg(short = 'q', long)]
         query: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 朋友圈互动通知：别人对我的朋友圈点赞/评论 + 我评过的帖子下的跟帖
+    /// Moments notifications: likes/comments on my posts + replies under posts I commented on
     SnsNotifications {
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 包含已读通知（默认仅未读）
+        /// Include read notifications (default: unread only)
         #[arg(long)]
         include_read: bool,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 朋友圈时间线：按时间/作者筛选本地缓存的朋友圈
+    /// Moments timeline: filter locally cached Moments by time/author
     SnsFeed {
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 只看指定作者（昵称 / 备注名 / 微信 ID，模糊匹配）
+        /// Only show this author (nickname / remark / WeChat ID, fuzzy match)
         #[arg(long)]
         user: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 查询公众号文章推送（本地缓存）
+    /// Query official account articles (local cache)
     BizArticles {
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 限定公众号（名称模糊匹配）
+        /// Restrict to official account (fuzzy name match)
         #[arg(long)]
         account: Option<String>,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 只看有未读的公众号，每个公众号取最新 1 篇
+        /// Only accounts with unread items, latest 1 article each
         #[arg(long)]
         unread: bool,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 朋友圈全文搜索：匹配正文关键词
+    /// Moments full-text search: match keyword in post text
     SnsSearch {
-        /// 关键词
+        /// Keyword
         keyword: String,
-        /// 结果数量
+        /// Number of results
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 限定作者（昵称 / 备注名 / 微信 ID）
+        /// Restrict to author (nickname / remark / WeChat ID)
         #[arg(long)]
         user: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 列出某会话的图片附件，返回不透明 attachment_id
+    /// List image attachments in a chat, returning opaque attachment_ids
     Attachments {
-        /// 会话名称（联系人显示名 / wxid / @chatroom username 都可以）
+        /// Chat name (contact display name / wxid / @chatroom username)
         chat: String,
-        /// 类型（当前仅支持 image）
+        /// Type (currently only image)
         #[arg(long = "kind", value_name = "KIND",
               value_parser = ["image", "img"])]
         kinds: Vec<String>,
-        /// 显示数量
+        /// Number to show
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
-        /// 分页偏移
+        /// Pagination offset
         #[arg(long, default_value = "0")]
         offset: usize,
-        /// 起始时间 YYYY-MM-DD
+        /// Start date YYYY-MM-DD
         #[arg(long)]
         since: Option<String>,
-        /// 结束时间 YYYY-MM-DD
+        /// End date YYYY-MM-DD
         #[arg(long)]
         until: Option<String>,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 把单个 attachment_id 对应的资源解密写到指定文件路径
+    /// Decrypt the resource for one attachment_id and write it to a file path
     Extract {
-        /// 由 `wx attachments` 输出的不透明 ID（base64url 字符串）
+        /// Opaque ID from `wx attachments` (base64url string)
         attachment_id: String,
-        /// 输出文件路径（绝对或相对当前工作目录均可；扩展名建议保留为 .jpg 等）
+        /// Output file path (absolute or relative to cwd; keep an extension like .jpg)
         #[arg(short = 'o', long)]
         output: String,
-        /// 目标已存在时覆盖
+        /// Overwrite if the target exists
         #[arg(long)]
         overwrite: bool,
-        /// 输出 JSON（默认 YAML）
+        /// Output JSON (default YAML)
         #[arg(long)]
         json: bool,
     },
-    /// 管理 wx-daemon
+    /// Manage wx-daemon
     Daemon {
         #[command(subcommand)]
         cmd: DaemonCommands,
     },
-    /// 环境 / 密钥 / 分片健康检查
+    /// Environment / key / shard health check
     Doctor {
-        /// 输出 JSON
+        /// Output JSON
         #[arg(long)]
         json: bool,
-        /// 打印修复建议命令
+        /// Print suggested fix commands
         #[arg(long)]
         fix: bool,
     },
-    /// 密钥管理
+    /// Key management
     Key {
         #[command(subcommand)]
         action: KeyAction,
     },
-    /// 跨会话时间线（按时间合并多 chat 消息）
+    /// Cross-chat timeline (merge messages from multiple chats by time)
     Timeline {
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
@@ -359,7 +359,7 @@ enum Commands {
         since: Option<String>,
         #[arg(long)]
         until: Option<String>,
-        /// 游标：只返回比该时间更旧的消息
+        /// Cursor: only return messages older than this time
         #[arg(long)]
         after: Option<String>,
         #[arg(long = "type", value_name = "TYPE", help = MSG_TYPE_HELP, value_parser = clap_parse_msg_type)]
@@ -367,18 +367,18 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// 实时监听新消息（轮询 session.db）
+    /// Watch for new messages in real time (polls session.db)
     Watch {
-        /// 轮询间隔毫秒
+        /// Poll interval in milliseconds
         #[arg(long, default_value = "1500")]
         interval: u64,
-        /// 每轮最多拉取条数
+        /// Maximum messages fetched per poll
         #[arg(short = 'n', long, default_value = "50")]
         limit: usize,
         #[arg(long)]
         json: bool,
     },
-    /// 媒体工具（语音等）
+    /// Media tools (voice, etc.)
     Media {
         #[command(subcommand)]
         action: MediaAction,
@@ -387,38 +387,38 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum KeyAction {
-    /// 扫描进程内存 / LLDB hook 提取密钥（建议 sudo）
+    /// Extract keys by scanning process memory / LLDB hook (sudo recommended)
     Extract {
         #[arg(long)]
         hook_seconds: Option<u64>,
     },
-    /// 列出 all_keys.json 中的密钥
+    /// List keys in all_keys.json
     List {
         #[arg(long)]
         json: bool,
-        /// 输出完整 enc_key（默认仅 preview，防误粘贴泄露）
+        /// Print full enc_key (default preview only, to avoid leaking by accidental paste)
         #[arg(long)]
         show_secrets: bool,
     },
-    /// 手动写入某个 DB 的密钥
+    /// Manually set the key for one DB
     Set {
-        /// 相对路径，如 message/message_1.db
+        /// Relative path, e.g. message/message_1.db
         db: String,
-        /// 64 位 hex
+        /// 64-character hex
         enc_key: String,
     },
 }
 
 #[derive(Subcommand)]
 enum MediaAction {
-    /// 按 svr_id 从 message/media_0.db 导出语音 silk 原始数据
+    /// Export raw voice silk data from message/media_0.db by svr_id
     Voice {
-        /// 消息 server id / svr_id
+        /// Message server id / svr_id
         svr_id: i64,
-        /// 可选 chat username（加速定位）
+        /// Optional chat username (speeds up lookup)
         #[arg(long)]
         chat: Option<String>,
-        /// 输出路径（.silk）
+        /// Output path (.silk)
         #[arg(short = 'o', long)]
         output: String,
     },
@@ -426,16 +426,16 @@ enum MediaAction {
 
 #[derive(Subcommand)]
 pub enum DaemonCommands {
-    /// 查看 daemon 运行状态
+    /// Show daemon status
     Status,
-    /// 停止 daemon
+    /// Stop daemon
     Stop,
-    /// 查看 daemon 日志
+    /// Show daemon logs
     Logs {
-        /// 持续输出（tail -f）
+        /// Follow output (tail -f)
         #[arg(short = 'f', long)]
         follow: bool,
-        /// 显示最近 N 行
+        /// Show last N lines
         #[arg(short = 'n', long, default_value = "50")]
         lines: usize,
     },
@@ -444,7 +444,7 @@ pub enum DaemonCommands {
 pub fn run() {
     let cli = Cli::parse();
     if let Err(e) = dispatch(cli) {
-        eprintln!("错误: {}", e);
+        eprintln!("Error: {}", e);
         std::process::exit(1);
     }
 }
@@ -734,7 +734,7 @@ mod clap_msg_type_wiring_tests {
         };
         let msg = err.to_string();
         assert!(
-            msg.contains("未知消息类型") || msg.contains("nope"),
+            msg.contains("Unknown message type") || msg.contains("nope"),
             "unexpected error: {msg}"
         );
     }

@@ -55,7 +55,7 @@ pub fn lookup_md5_blocking(
         resource_db_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
     )
-    .with_context(|| format!("打开 message_resource.db {:?}", resource_db_path))?;
+    .with_context(|| format!("Opening message_resource.db {:?}", resource_db_path))?;
 
     // 1) ChatName2Id: user_name -> rowid
     let chat_id: Option<i64> = conn
@@ -261,7 +261,7 @@ pub fn resolve_blocking(
     )?
         .ok_or_else(|| {
             anyhow!(
-                "message_resource.db 中找不到 chat={} local_id={} type={} 的资源行（可能是非附件消息或资源库未同步）",
+                "No resource row for chat={} local_id={} type={} in message_resource.db (maybe not an attachment message, or the resource DB is not synced)",
                 id.chat,
                 id.local_id,
                 lo32_type
@@ -271,7 +271,7 @@ pub fn resolve_blocking(
     let dat_path = find_dat_file(attach_root, &id.chat, &meta.md5, id.create_time).ok_or_else(
         || {
             anyhow!(
-                "找不到本地 .dat（md5={} chat={} create_time={}）— 微信可能尚未下载该附件，或附件已被清理",
+                "Local .dat not found (md5={} chat={} create_time={}) — WeChat may not have downloaded the attachment yet, or it was cleaned up",
                 meta.md5,
                 id.chat,
                 id.create_time

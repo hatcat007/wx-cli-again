@@ -59,7 +59,7 @@ pub fn parse_time(s: &str) -> Result<i64> {
                 .from_local_datetime(&dt)
                 .single()
                 .map(|d| d.timestamp())
-                .ok_or_else(|| anyhow::anyhow!("本地时间歧义: {}", s));
+                .ok_or_else(|| anyhow::anyhow!("Ambiguous local time: {}", s));
         }
     }
     if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
@@ -68,10 +68,10 @@ pub fn parse_time(s: &str) -> Result<i64> {
             .from_local_datetime(&dt)
             .single()
             .map(|d| d.timestamp())
-            .ok_or_else(|| anyhow::anyhow!("本地时间歧义: {}", s));
+            .ok_or_else(|| anyhow::anyhow!("Ambiguous local time: {}", s));
     }
     anyhow::bail!(
-        "无法解析时间 '{}'，支持 YYYY-MM-DD / YYYY-MM-DD HH:MM / YYYY-MM-DD HH:MM:SS",
+        "Cannot parse time '{}'; supported: YYYY-MM-DD / YYYY-MM-DD HH:MM / YYYY-MM-DD HH:MM:SS",
         s
     )
 }
@@ -85,7 +85,7 @@ pub fn parse_time_end(s: &str) -> Result<i64> {
                 .from_local_datetime(&dt)
                 .single()
                 .map(|d| d.timestamp())
-                .ok_or_else(|| anyhow::anyhow!("本地时间歧义: {}", s));
+                .ok_or_else(|| anyhow::anyhow!("Ambiguous local time: {}", s));
         }
     }
     parse_time(s)
@@ -116,8 +116,8 @@ pub fn parse_msg_type(s: &str) -> Option<i64> {
 pub fn parse_msg_type_required(s: &str) -> Result<i64> {
     parse_msg_type(s).ok_or_else(|| {
         anyhow::anyhow!(
-            "未知消息类型 '{}'。支持: text, image, voice, video, card, sticker, location, \
-             link|file|appmsg, call, system, revoke，或数字 type_code",
+            "Unknown message type '{}'. Supported: text, image, voice, video, card, sticker, location, \
+             link|file|appmsg, call, system, revoke, or a numeric type_code",
             s
         )
     })
