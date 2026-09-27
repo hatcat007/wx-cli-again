@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="botiverse/wx-cli"
+REPO="hatcat007/wx-cli-again"
 BIN_NAME="wx"
 INSTALL_DIR="/usr/local/bin"
 

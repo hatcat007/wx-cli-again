@@ -36,12 +36,12 @@ description: "wx-cli — 从本地微信数据库查询聊天记录、联系人�
 
 ## 安装
 
-源码仓库：[botiverse/wx-cli](https://github.com/botiverse/wx-cli)（当前 **private**）。
+源码仓库：[hatcat007/wx-cli-again](https://github.com/hatcat007/wx-cli-again)（当前 **private**）。
 
 ### 推荐：源码构建（需仓库读权限 + SSH）
 
 ```bash
-git clone git@github.com:botiverse/wx-cli.git && cd wx-cli
+git clone git@github.com:hatcat007/wx-cli-again.git && cd wx-cli
 cargo build --release
 mkdir -p ~/.local/bin && cp target/release/wx ~/.local/bin/wx
 wx --version
@@ -55,7 +55,7 @@ cd /path/to/wx-cli && git pull && cargo build --release && cp target/release/wx 
 
 ### 其他
 
-- 有 `gh` 权限时：`gh release download -R botiverse/wx-cli -p 'wx-macos-arm64' -O ~/.local/bin/wx`
+- 有 `gh` 权限时：`gh release download -R hatcat007/wx-cli-again -p 'wx-macos-arm64' -O ~/.local/bin/wx`
 - **不要**依赖公开 npm `@jackwener/wx-cli`（registry 上可能是旧版本）
 - 匿名 curl `install.sh` 在 private 仓库下会 404
 

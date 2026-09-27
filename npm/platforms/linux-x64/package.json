@@ -1,5 +1,5 @@
 {
-  "name": "@jackwener/wx-cli-linux-x64",
+  "name": "@hatcat007/wx-cli-linux-x64",
   "version": "0.6.3",
   "description": "wx-cli binary for Linux x64",
   "os": [

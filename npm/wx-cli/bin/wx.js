@@ -6,11 +6,11 @@ const path = require('path');
 const fs = require('fs');
 
 const PLATFORM_PACKAGES = {
-  'darwin-arm64': '@jackwener/wx-cli-darwin-arm64',
-  'darwin-x64':   '@jackwener/wx-cli-darwin-x64',
-  'linux-x64':    '@jackwener/wx-cli-linux-x64',
-  'linux-arm64':  '@jackwener/wx-cli-linux-arm64',
-  'win32-x64':    '@jackwener/wx-cli-win32-x64',
+  'darwin-arm64': '@hatcat007/wx-cli-darwin-arm64',
+  'darwin-x64':   '@hatcat007/wx-cli-darwin-x64',
+  'linux-x64':    '@hatcat007/wx-cli-linux-x64',
+  'linux-arm64':  '@hatcat007/wx-cli-linux-arm64',
+  'win32-x64':    '@hatcat007/wx-cli-win32-x64',
 };
 
 const platformKey = `${process.platform}-${process.arch}`;
@@ -38,7 +38,7 @@ function getBinaryPath() {
   }
 
   console.error(`wx-cli: binary not found for ${platformKey}`);
-  console.error('Try: npm install -g @jackwener/wx-cli');
+  console.error('Try: npm install -g @hatcat007/wx-cli');
   process.exit(1);
 }
 

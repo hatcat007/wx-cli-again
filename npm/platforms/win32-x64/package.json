@@ -1,5 +1,5 @@
 {
-  "name": "@jackwener/wx-cli-win32-x64",
+  "name": "@hatcat007/wx-cli-win32-x64",
   "version": "0.6.3",
   "description": "wx-cli binary for Windows x64",
   "os": [
