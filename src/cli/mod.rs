@@ -12,6 +12,7 @@ pub mod key_cmd;
 pub mod media;
 pub mod members;
 pub mod new_messages;
+pub mod ocr;
 pub mod output;
 pub mod search;
 pub mod sessions;
@@ -330,6 +331,35 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Bulk-decrypt a chat's images and OCR them with a local LM Studio model
+    Ocr {
+        /// Chat name (contact display name / wxid / @chatroom username)
+        chat: String,
+        /// Output directory for images and .txt OCR results
+        #[arg(short = 'o', long, default_value = "wx-ocr")]
+        out: String,
+        /// Maximum images to process (default: all)
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
+        /// Start date YYYY-MM-DD
+        #[arg(long)]
+        since: Option<String>,
+        /// End date YYYY-MM-DD
+        #[arg(long)]
+        until: Option<String>,
+        /// LM Studio OpenAI-compatible endpoint (loopback only)
+        #[arg(long, default_value = "http://localhost:1234/v1")]
+        endpoint: String,
+        /// Model name loaded in LM Studio
+        #[arg(long, default_value = "glm-ocr")]
+        model: String,
+        /// Instruction sent with each image
+        #[arg(long, default_value = "Extract all text in this image. Output only the text.")]
+        prompt: String,
+        /// Output JSON (default YAML)
+        #[arg(long)]
+        json: bool,
+    },
     /// Manage wx-daemon
     Daemon {
         #[command(subcommand)]
@@ -635,6 +665,27 @@ fn dispatch(cli: Cli) -> Result<()> {
             overwrite,
             json,
         } => extract::cmd_extract(attachment_id, output, overwrite, json),
+        Commands::Ocr {
+            chat,
+            out,
+            limit,
+            since,
+            until,
+            endpoint,
+            model,
+            prompt,
+            json,
+        } => ocr::cmd_ocr(ocr::OcrArgs {
+            chat,
+            out,
+            limit,
+            since,
+            until,
+            endpoint,
+            model,
+            prompt,
+            json,
+        }),
         Commands::Daemon { cmd } => daemon_cmd::cmd_daemon(cmd),
         Commands::Doctor { json, fix } => doctor::cmd_doctor(json, fix),
         Commands::Key { action } => match action {

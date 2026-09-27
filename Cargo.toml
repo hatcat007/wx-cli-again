@@ -53,6 +53,9 @@ md5 = "0.7"
 # 附件 ID 编码（base64url）
 base64 = "0.22"
 
+# Local OCR via LM Studio (plain HTTP to loopback only; no TLS)
+ureq = { version = "2", default-features = false }
+
 # 正则表达式
 regex = "1"
 roxmltree = "0.20"
